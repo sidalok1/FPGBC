@@ -473,7 +473,7 @@ module Core( clk, din, dout, addrbus, write_mem, wake );
                     endcase
                 end
                 'b100: begin
-                    //TODO: inc r8
+                    //TEST: inc r8
                     alu_op = `ADD;
                     if ( IR[5:3] == 3'b110 ) begin
                         case ( state )
@@ -518,7 +518,7 @@ module Core( clk, din, dout, addrbus, write_mem, wake );
                     end
                 end
                 'b101: begin
-                    //TODO: dec r8
+                    //TEST: dec r8
                     alu_op = `SUB;
                     if ( IR[5:3] == 3'b110 ) begin
                         case ( state )
@@ -562,7 +562,34 @@ module Core( clk, din, dout, addrbus, write_mem, wake );
                         idu_dest = `idu_pc;
                     end
                 end
-                'b110:;//TODO: ld r8, imm8
+                'b110: begin
+                    //TODO: ld r8, imm8
+                    case ( state )
+                    0: begin
+                        next = 1;
+                        writez = `wz_din;
+                        idu_dest = `idu_pc;
+                    end
+                    1: begin
+                        if ( IR[5:3] == 3'b110 ) begin
+                            next = 2;
+                            addr = `addr_r8_2;
+                            dout = z;
+                            write_mem = 1;
+                        end else begin
+                            next = 0;
+                            reg_write1 = `src_z;
+                            reg_sel1 = IR[5:3];
+                            idu_dest = `idu_pc;
+                        end
+                    end
+                    2: begin
+                        next = 0;
+                        fetch = 1;
+                        idu_dest = `idu_pc;
+                    end
+                    endcase
+                end
                 'b111: begin
                     case ( IR[5:3] )
                     'b000:;//TODO: rlca
