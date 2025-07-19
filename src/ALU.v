@@ -1,7 +1,7 @@
 `include "ALU_headers.vh"
 
 module ALU ( op, in1, in2, out, carry_in, flags_out );
-    input [`OPWIDTH:0] op;
+    input [`ALU_opwidth:0] op;
     input [7:0] in1, in2;
     input carry_in;
     output wire [7:0] out;
@@ -18,6 +18,7 @@ module ALU ( op, in1, in2, out, carry_in, flags_out );
     always @( op, in1, in2 ) begin
 
         case (op) 
+        `PAS: full_result[7:0] <= in1;
         `ADD: begin
             full_result = in1 + in2;
             half_result = in1[3:0] + in2[3:0];
