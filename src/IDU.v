@@ -12,7 +12,7 @@ module IDU(
     input   wire                        sign, carry;
     output  reg     [15:0]              out;
 
-    always @* begin
+    always @( addr_in, op, sign, carry ) begin
         case ( op )
         `PAS: out = addr_in;
         `INC: out = addr_in + 1;

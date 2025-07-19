@@ -17,24 +17,30 @@ module RegisterFile (
 
     input wire  [3:0]   r1, r2, addrh, addrl;
     input wire  [7:0]   ctr;
-    output reg  [7:0]   alu1, alu2;
+    output wire [7:0]   alu1, alu2;
 
-    output reg  [15:0]  addr;
+    output wire  [15:0]  addr;
     input wire  [15:0]  idu;
-    input wire  [3:0]   rd_idu;
+    input wire  [2:0]   rd_idu;
     
-    reg [7:0] r8 [0:15];
+    reg [7:0] r8 [0:15]; 
+
+    assign alu1 = r8[r1];
+    assign alu2 = r8[r2];
+    assign addr = {r8[addrh], r8[addrl]};
 
     integer i;
     initial begin
-        for (i = 0; i <= `a; i = i + 1) r8[i] = 0;
+        for (i = 0; i < 16; i = i + 1) begin
+            r8[i] = 0;
+        end
+        
         r8[`one] = 8'b1;
     end
 
     assign carry_out = r8[`f][4];
 
     always @ ( posedge clk ) begin
-
         case ( rd )
         `b, `c, `d, `e, `h, 
         `l, `a, `pch, `pcl, 
@@ -54,18 +60,10 @@ module RegisterFile (
         `_w: r8[`w] <= idu[7:0];
         `ff:; // garbage writes
         endcase
-
     end
 
-    always @( r1, r2, addrh, addrl, ctr ) begin
-
+    always @( ctr ) begin
         r8[`ctr] = ctr;
-
-        alu1 = r8[r1];
-        alu2 = r8[r2];
-        addr[15:8] = r8[addrh];
-        addr[7:0] = r8[addrl];
-
     end
 
 endmodule

@@ -1,6 +1,7 @@
 `timescale 1ns / 1ps
 
-`include "ISA.vh"
+`define NOP 8'b00000000 
+`define LDI16SP 8'b00001000
 
 module tb_core();
 
@@ -16,6 +17,9 @@ module tb_core();
 
     Testmem memory( clk, core_addrbus, core_write, core_dout, core_din );
     
+    always @ ( posedge clk ) 
+        $display("%0t", $time);
+
     integer i;
     initial begin
         $dumpvars(0, tb_core);
@@ -25,10 +29,12 @@ module tb_core();
         memory.mem[2] = 8'h05;
         memory.mem[3] = 8'h00;
         memory.mem[4] = `NOP;
+        UUT.regfile.r8[10] = 8'hab;
+        UUT.regfile.r8[11] = 8'hcd;
 
-        for (i = 0; i < 10; i = i + 1) begin
-            $dumpvars(0, tb_core.memory.mem[i]); // manually dump for icarus
-            $dumpvars(0, tb_core.UUT.regs[i]);
+        for (i = 0; i < 16; i = i + 1) begin
+            $dumpvars(0, tb_core.memory.mem[i]);
+            // $dumpvars(0, tb_core.UUT.regfile.r8[i]);
         end
 
 

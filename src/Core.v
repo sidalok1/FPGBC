@@ -7,7 +7,7 @@ module Core( clk, din, dout, addrbus, write_mem, wake );
 
     input clk;
     input wake;
-    input [7:0] din;
+    input wire [7:0] din;
     output wire [7:0] dout;
     output wire [15:0] addrbus;
     output wire write_mem;
@@ -32,7 +32,9 @@ module Core( clk, din, dout, addrbus, write_mem, wake );
 
     assign reg_din = sig_data_sel == `din ? din : alu_out;
 
-    reg [7:0] IR;
+    assign dout = alu_out;
+
+    reg [7:0] IR = 0;
     wire fetch;
 
     ControlUnit controller (
@@ -44,6 +46,7 @@ module Core( clk, din, dout, addrbus, write_mem, wake );
         .addrh( sig_addrh ), .addrl( sig_addrl ),
         .writeback( sig_writeback ),
         .alu_op( sig_alu_op ), .flag_mask( sig_flag_mask ),
+        .idu_op( sig_idu_op ),
         .intr_req( wake )
     );
 
@@ -62,7 +65,7 @@ module Core( clk, din, dout, addrbus, write_mem, wake );
         .in1( alu_in1 ), .in2( alu_in2 ), .carry_in( carry ),
         .out( alu_out ), .flags_out( alu_flags )
     );
-
+ 
     IDU idu_inst (
         .addr_in( addrbus ),
         .op( sig_idu_op ),
@@ -71,10 +74,12 @@ module Core( clk, din, dout, addrbus, write_mem, wake );
     );
     
     always @ ( posedge clk ) begin
-        if ( fetch ) IR <= din;
+        if ( fetch ) begin 
+            IR <= din;
+        end
     end
 
-    always @* begin
+    // always @* begin
         // next = 0;
         // fetch = 0;
         // addr = `addr_pc;
@@ -608,6 +613,6 @@ module Core( clk, din, dout, addrbus, write_mem, wake );
         //     'b11:;//TODO: set b3, r8
         //     endcase
         // end
-    end
+    // end
 
 endmodule
