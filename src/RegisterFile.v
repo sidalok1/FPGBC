@@ -2,7 +2,7 @@
 
 module RegisterFile ( 
     clk, 
-    rd, din, flags, mask, carry_out,
+    rd, din, flags_in, mask, flags_out,
     r1, r2, ctr, alu1, alu2,
     addr, addrh, addrl, idu, rd_idu
     );
@@ -12,8 +12,9 @@ module RegisterFile (
     input wire  [3:0]   rd;
     input wire  [7:0]   din;
 
-    input wire  [3:0]   flags, mask;
-    output wire         carry_out;
+    input wire  [3:0]   flags_in;
+    output wire [3:0]   flags_out;
+    input wire  [4:0]   mask;
 
     input wire  [3:0]   r1, r2, addrh, addrl;
     input wire  [7:0]   ctr;
@@ -38,7 +39,7 @@ module RegisterFile (
         r8[`one] = 8'b1;
     end
 
-    assign carry_out = r8[`f][4];
+    assign flags_out = r8[`f];
 
     always @ ( posedge clk ) begin
         case ( rd )
@@ -48,7 +49,8 @@ module RegisterFile (
         `ctr, `one, `f:; // garbage writes
         endcase
 
-        r8[`f][7:4] <= (flags & mask) | (r8[`f][7:4] & ~mask);
+        if ( mask[4] )
+            r8[`f][7:4] <= (flags_in & mask[3:0]) | (r8[`f][7:4] & ~mask[3:0]);
 
         case ( rd_idu )
         `bc: {r8[`b], r8[`c]} <= idu;

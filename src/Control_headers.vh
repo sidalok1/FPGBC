@@ -4,10 +4,11 @@
 
 
 // mask for writeback to flags register
-`define fz 4'b1000
-`define fn 4'b0100
-`define fh 4'b0010
-`define fc 4'b0001
+// bit 4 is write enable
+`define fz 5'b11000
+`define fn 5'b10100
+`define fh 5'b10010
+`define fc 5'b10001
 
 // data bus in select
 `define din 0
