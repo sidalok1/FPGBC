@@ -1,10 +1,10 @@
 `timescale 1ns / 1ps
 
-`define NOP         8'b00000000 
-`define LDI16SP     8'b00001000
-`define ADDHLSP     8'b00111001
-`define LDR16I16    8'b00000001
-`define JRI8        8'b00011000
+// `define NOP         8'b00000000 
+// `define LDI16SP     8'b00001000
+// `define ADDHLSP     8'b00111001
+// `define LDR16I16    8'b00000001
+// `define JRI8        8'b00011000
 
 module tb_core();
 
@@ -27,26 +27,30 @@ module tb_core();
     initial begin
         $dumpvars(0, tb_core);
         // setup
-        memory.mem[0]   = `NOP;
-        memory.mem[1]   = `LDI16SP;
-        memory.mem[2]   = 8'h0e;
-        memory.mem[3]   = 8'h00;
-        memory.mem[4]   = `ADDHLSP;
-        memory.mem[5]   = `LDR16I16;
-        memory.mem[6]   = 8'h34;
-        memory.mem[7]   = 8'h12;
-        memory.mem[8]   = `JRI8;
-        memory.mem[9]   = 8'd3;
-        memory.mem[10]  = `LDR16I16;
-        memory.mem[11]  = 8'hff;
-        memory.mem[12]  = 8'hff;
+        // memory.mem[0]   = `NOP;
+        // memory.mem[1]   = `LDI16SP;
+        // memory.mem[2]   = 8'h0e;
+        // memory.mem[3]   = 8'h00;
+        // memory.mem[4]   = `ADDHLSP;
+        // memory.mem[5]   = `LDR16I16;
+        // memory.mem[6]   = 8'h34;
+        // memory.mem[7]   = 8'h12;
+        // memory.mem[8]   = `JRI8;
+        // memory.mem[9]   = 8'd3;
+        // memory.mem[10]  = `LDR16I16;
+        // memory.mem[11]  = 8'hff;
+        // memory.mem[12]  = 8'hff;
         
-        UUT.regfile.r8[10] = 8'hab;
-        UUT.regfile.r8[11] = 8'hcd;
+        // UUT.regfile.r8[10] = 8'hab;
+        // UUT.regfile.r8[11] = 8'hcd;
+
+        $readmemb("test/rom.mem", memory.mem);
 
         for (i = 0; i < 16; i = i + 1) begin
-            $dumpvars(0, tb_core.memory.mem[i]);
             $dumpvars(0, tb_core.UUT.regfile.r8[i]);
+        end
+        for (i = 0; i < 256; i = i + 1)begin
+            $dumpvars(0, tb_core.memory.mem[i]);
         end
 
 
