@@ -5,10 +5,16 @@ VPATH=src:test
 
 default: sim
 
-sim: _out/waveform.fst $(SAVE)
+sim: _out/waveform.fst $(SAVE) mem filt
 	gtkwave _out/waveform.fst $(SAVE)
 
 mem: test/rom.mem
+
+filt: gbfilt/target/release/gbfilt
+
+gbfilt/target/release/gbfilt: $(wildcard gbfilt/src/*.rs)
+	cd gbfilt && \
+		cargo build --release --manifest-path Cargo.toml
 
 $(SAVE):
 	touch $(SAVE)
