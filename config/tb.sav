@@ -1,22 +1,22 @@
 [*]
 [*] GTKWave Analyzer v3.3.116 (w)1999-2023 BSI
-[*] Fri Jul 25 13:40:17 2025
+[*] Fri Jul 25 15:46:13 2025
 [*]
 [dumpfile] "./_out/waveform.fst"
-[dumpfile_mtime] "Fri Jul 25 13:35:59 2025"
-[dumpfile_size] 4137
+[dumpfile_mtime] "Fri Jul 25 15:46:05 2025"
+[dumpfile_size] 5713
 [savefile] "./config/tb.sav"
-[timestart] 994790
+[timestart] 0
 [size] 1440 960
 [pos] 110985 98591
-*-14.284844 260000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-14.284844 0 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] tb_core.
 [treeopen] tb_core.UUT.
 [sst_width] 276
 [signals_width] 186
 [sst_expanded] 1
 [sst_vpaned_height] 284
-@28
+@29
 tb_core.clk
 @800200
 -Core
@@ -105,7 +105,7 @@ tb_core.UUT.regfile.flags_out[3:0]
 @22
 tb_core.UUT.regfile.\r8[0][7:0]
 tb_core.UUT.regfile.\r8[1][7:0]
-@1401600
+@1401200
 -group_end
 @c00420
 [color] 3
@@ -113,15 +113,15 @@ tb_core.UUT.regfile.\r8[1][7:0]
 @22
 tb_core.UUT.regfile.\r8[2][7:0]
 tb_core.UUT.regfile.\r8[3][7:0]
-@1401600
+@1401200
 -group_end
-@c00421
+@c00420
 [color] 5
 #{hl} (0)tb_core.UUT.regfile.\r8[4][7:0] (1)tb_core.UUT.regfile.\r8[4][7:0] (2)tb_core.UUT.regfile.\r8[4][7:0] (3)tb_core.UUT.regfile.\r8[4][7:0] (4)tb_core.UUT.regfile.\r8[4][7:0] (5)tb_core.UUT.regfile.\r8[4][7:0] (6)tb_core.UUT.regfile.\r8[4][7:0] (7)tb_core.UUT.regfile.\r8[4][7:0] (0)tb_core.UUT.regfile.\r8[5][7:0] (1)tb_core.UUT.regfile.\r8[5][7:0] (2)tb_core.UUT.regfile.\r8[5][7:0] (3)tb_core.UUT.regfile.\r8[5][7:0] (4)tb_core.UUT.regfile.\r8[5][7:0] (5)tb_core.UUT.regfile.\r8[5][7:0] (6)tb_core.UUT.regfile.\r8[5][7:0] (7)tb_core.UUT.regfile.\r8[5][7:0]
 @22
 tb_core.UUT.regfile.\r8[4][7:0]
 tb_core.UUT.regfile.\r8[5][7:0]
-@1401601
+@1401200
 -group_end
 @c00024
 #{pc} (0)tb_core.UUT.regfile.\r8[8][7:0] (1)tb_core.UUT.regfile.\r8[8][7:0] (2)tb_core.UUT.regfile.\r8[8][7:0] (3)tb_core.UUT.regfile.\r8[8][7:0] (4)tb_core.UUT.regfile.\r8[8][7:0] (5)tb_core.UUT.regfile.\r8[8][7:0] (6)tb_core.UUT.regfile.\r8[8][7:0] (7)tb_core.UUT.regfile.\r8[8][7:0] (0)tb_core.UUT.regfile.\r8[9][7:0] (1)tb_core.UUT.regfile.\r8[9][7:0] (2)tb_core.UUT.regfile.\r8[9][7:0] (3)tb_core.UUT.regfile.\r8[9][7:0] (4)tb_core.UUT.regfile.\r8[9][7:0] (5)tb_core.UUT.regfile.\r8[9][7:0] (6)tb_core.UUT.regfile.\r8[9][7:0] (7)tb_core.UUT.regfile.\r8[9][7:0]
