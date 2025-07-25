@@ -26,7 +26,7 @@ module RegisterFile (
     
     reg [7:0] r8 [0:15]; 
 
-    reg [3:0] flags;
+    reg [3:0] flags = 0;
 
     assign alu1 = r8[r1];
     assign alu2 = r8[r2];

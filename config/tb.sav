@@ -1,19 +1,19 @@
 [*]
 [*] GTKWave Analyzer v3.3.116 (w)1999-2023 BSI
-[*] Fri Jul 25 05:00:21 2025
+[*] Fri Jul 25 13:40:17 2025
 [*]
-[dumpfile] "/home/sid/code/SM83/_out/waveform.fst"
-[dumpfile_mtime] "Fri Jul 25 04:46:58 2025"
-[dumpfile_size] 4185
-[savefile] "/home/sid/code/SM83/config/tb.sav"
-[timestart] 240490
+[dumpfile] "./_out/waveform.fst"
+[dumpfile_mtime] "Fri Jul 25 13:35:59 2025"
+[dumpfile_size] 4137
+[savefile] "./config/tb.sav"
+[timestart] 994790
 [size] 1440 960
-[pos] 110853 98490
+[pos] 110985 98591
 *-14.284844 260000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] tb_core.
 [treeopen] tb_core.UUT.
 [sst_width] 276
-[signals_width] 158
+[signals_width] 186
 [sst_expanded] 1
 [sst_vpaned_height] 284
 @28
@@ -21,8 +21,8 @@ tb_core.clk
 @800200
 -Core
 @c04022
-^>1 /home/sid/code/SM83/gbfilt/target/release/gbfilt
-tb_core.UUT.IR[7:0]
+^>1 ./gbfilt/target/release/gbfilt
++{Instruction} tb_core.UUT.IR[7:0]
 @28
 (0)tb_core.UUT.IR[7:0]
 (1)tb_core.UUT.IR[7:0]
@@ -35,23 +35,23 @@ tb_core.UUT.IR[7:0]
 @1401200
 -group_end
 @2028
-^1 /home/sid/code/SM83/config/state.filt
-tb_core.UUT.controller.state[5:0]
+^1 ./config/state.filt
++{State} tb_core.UUT.controller.state[5:0]
 @22
-tb_core.UUT.addrbus[15:0]
-tb_core.UUT.din[7:0]
-tb_core.UUT.dout[7:0]
++{Address Bus} tb_core.UUT.addrbus[15:0]
++{Data in} tb_core.UUT.din[7:0]
++{Data out} tb_core.UUT.dout[7:0]
 @28
 tb_core.UUT.fetch
 tb_core.UUT.write_mem
 @1000200
 -Core
 @2022
-^2 /home/sid/code/SM83/config/reg8.filt
+^2 ./config/reg8.filt
 tb_core.UUT.controller.r1[3:0]
-^2 /home/sid/code/SM83/config/reg8.filt
+^2 ./config/reg8.filt
 tb_core.UUT.controller.r2[3:0]
-^2 /home/sid/code/SM83/config/reg8.filt
+^2 ./config/reg8.filt
 tb_core.UUT.controller.rd[3:0]
 @800200
 -Registers
@@ -62,7 +62,20 @@ tb_core.UUT.controller.rd[3:0]
 +{c} tb_core.UUT.regfile.\r8[1][7:0]
 [color] 3
 +{d} tb_core.UUT.regfile.\r8[2][7:0]
+@c00022
 +{e} tb_core.UUT.regfile.\r8[3][7:0]
+@28
+(0)tb_core.UUT.regfile.\r8[3][7:0]
+(1)tb_core.UUT.regfile.\r8[3][7:0]
+(2)tb_core.UUT.regfile.\r8[3][7:0]
+(3)tb_core.UUT.regfile.\r8[3][7:0]
+(4)tb_core.UUT.regfile.\r8[3][7:0]
+(5)tb_core.UUT.regfile.\r8[3][7:0]
+(6)tb_core.UUT.regfile.\r8[3][7:0]
+(7)tb_core.UUT.regfile.\r8[3][7:0]
+@1401200
+-group_end
+@22
 [color] 5
 +{h} tb_core.UUT.regfile.\r8[4][7:0]
 [color] 6
@@ -80,11 +93,36 @@ tb_core.UUT.controller.rd[3:0]
 (7)tb_core.UUT.regfile.\r8[6][7:0]
 @1401200
 -group_end
-@23
-tb_core.UUT.regfile.flags_out[3:0]
 @22
+tb_core.UUT.regfile.flags_out[3:0]
 [color] 7
 +{a} tb_core.UUT.regfile.\r8[7][7:0]
+@200
+-
+@c00420
+[color] 1
+#{bc} (0)tb_core.UUT.regfile.\r8[0][7:0] (1)tb_core.UUT.regfile.\r8[0][7:0] (2)tb_core.UUT.regfile.\r8[0][7:0] (3)tb_core.UUT.regfile.\r8[0][7:0] (4)tb_core.UUT.regfile.\r8[0][7:0] (5)tb_core.UUT.regfile.\r8[0][7:0] (6)tb_core.UUT.regfile.\r8[0][7:0] (7)tb_core.UUT.regfile.\r8[0][7:0] (0)tb_core.UUT.regfile.\r8[1][7:0] (1)tb_core.UUT.regfile.\r8[1][7:0] (2)tb_core.UUT.regfile.\r8[1][7:0] (3)tb_core.UUT.regfile.\r8[1][7:0] (4)tb_core.UUT.regfile.\r8[1][7:0] (5)tb_core.UUT.regfile.\r8[1][7:0] (6)tb_core.UUT.regfile.\r8[1][7:0] (7)tb_core.UUT.regfile.\r8[1][7:0]
+@22
+tb_core.UUT.regfile.\r8[0][7:0]
+tb_core.UUT.regfile.\r8[1][7:0]
+@1401600
+-group_end
+@c00420
+[color] 3
+#{de} (0)tb_core.UUT.regfile.\r8[2][7:0] (1)tb_core.UUT.regfile.\r8[2][7:0] (2)tb_core.UUT.regfile.\r8[2][7:0] (3)tb_core.UUT.regfile.\r8[2][7:0] (4)tb_core.UUT.regfile.\r8[2][7:0] (5)tb_core.UUT.regfile.\r8[2][7:0] (6)tb_core.UUT.regfile.\r8[2][7:0] (7)tb_core.UUT.regfile.\r8[2][7:0] (0)tb_core.UUT.regfile.\r8[3][7:0] (1)tb_core.UUT.regfile.\r8[3][7:0] (2)tb_core.UUT.regfile.\r8[3][7:0] (3)tb_core.UUT.regfile.\r8[3][7:0] (4)tb_core.UUT.regfile.\r8[3][7:0] (5)tb_core.UUT.regfile.\r8[3][7:0] (6)tb_core.UUT.regfile.\r8[3][7:0] (7)tb_core.UUT.regfile.\r8[3][7:0]
+@22
+tb_core.UUT.regfile.\r8[2][7:0]
+tb_core.UUT.regfile.\r8[3][7:0]
+@1401600
+-group_end
+@c00421
+[color] 5
+#{hl} (0)tb_core.UUT.regfile.\r8[4][7:0] (1)tb_core.UUT.regfile.\r8[4][7:0] (2)tb_core.UUT.regfile.\r8[4][7:0] (3)tb_core.UUT.regfile.\r8[4][7:0] (4)tb_core.UUT.regfile.\r8[4][7:0] (5)tb_core.UUT.regfile.\r8[4][7:0] (6)tb_core.UUT.regfile.\r8[4][7:0] (7)tb_core.UUT.regfile.\r8[4][7:0] (0)tb_core.UUT.regfile.\r8[5][7:0] (1)tb_core.UUT.regfile.\r8[5][7:0] (2)tb_core.UUT.regfile.\r8[5][7:0] (3)tb_core.UUT.regfile.\r8[5][7:0] (4)tb_core.UUT.regfile.\r8[5][7:0] (5)tb_core.UUT.regfile.\r8[5][7:0] (6)tb_core.UUT.regfile.\r8[5][7:0] (7)tb_core.UUT.regfile.\r8[5][7:0]
+@22
+tb_core.UUT.regfile.\r8[4][7:0]
+tb_core.UUT.regfile.\r8[5][7:0]
+@1401601
+-group_end
 @c00024
 #{pc} (0)tb_core.UUT.regfile.\r8[8][7:0] (1)tb_core.UUT.regfile.\r8[8][7:0] (2)tb_core.UUT.regfile.\r8[8][7:0] (3)tb_core.UUT.regfile.\r8[8][7:0] (4)tb_core.UUT.regfile.\r8[8][7:0] (5)tb_core.UUT.regfile.\r8[8][7:0] (6)tb_core.UUT.regfile.\r8[8][7:0] (7)tb_core.UUT.regfile.\r8[8][7:0] (0)tb_core.UUT.regfile.\r8[9][7:0] (1)tb_core.UUT.regfile.\r8[9][7:0] (2)tb_core.UUT.regfile.\r8[9][7:0] (3)tb_core.UUT.regfile.\r8[9][7:0] (4)tb_core.UUT.regfile.\r8[9][7:0] (5)tb_core.UUT.regfile.\r8[9][7:0] (6)tb_core.UUT.regfile.\r8[9][7:0] (7)tb_core.UUT.regfile.\r8[9][7:0]
 @22
@@ -110,12 +148,16 @@ tb_core.UUT.regfile.\r8[11][7:0]
 @800200
 -ALU
 @2022
-^3 /home/sid/code/SM83/config/alu.filt
+^3 ./config/alu.filt
 tb_core.UUT.alu_inst.op[3:0]
-@22
+@420
 tb_core.UUT.alu_inst.in1[7:0]
 tb_core.UUT.alu_inst.in2[7:0]
+@28
+tb_core.UUT.alu_inst.carry_in
+@420
 tb_core.UUT.alu_inst.out[7:0]
+@22
 tb_core.UUT.alu_inst.flags_out[3:0]
 @c00022
 tb_core.UUT.alu_inst.full_result[8:0]
@@ -131,13 +173,12 @@ tb_core.UUT.alu_inst.full_result[8:0]
 (8)tb_core.UUT.alu_inst.full_result[8:0]
 @1401200
 -group_end
-@28
-tb_core.UUT.alu_inst.carry_in
 @1000200
 -ALU
 @22
 tb_core.UUT.idu_inst.addr_in[15:0]
-@28
+@2028
+^4 ./config/idu.filt
 tb_core.UUT.idu_inst.op[1:0]
 @22
 tb_core.UUT.idu_inst.out[15:0]
@@ -147,12 +188,12 @@ tb_core.UUT.idu_inst.sign
 @800200
 -Cond
 @2028
-^4 /home/sid/code/SM83/config/cond.filt
+^5 ./config/cond.filt
 tb_core.UUT.cond_check.cc[1:0]
 @22
 tb_core.UUT.cond_check.flags[3:0]
 @2028
-^5 /home/sid/code/SM83/config/bool.filt
+^6 ./config/bool.filt
 tb_core.UUT.cond_check.result
 @1000200
 -Cond

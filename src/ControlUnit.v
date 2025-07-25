@@ -39,6 +39,17 @@ module ControlUnit(
     reg [7:0] IE = 0;
     reg IME;
 
+    wire [`IDU_opwidth:0] r16mem_op [0:3];
+    assign r16mem_op[0] = `PAS; // [bc]
+    assign r16mem_op[1] = `PAS; // [de]
+    assign r16mem_op[2] = `INC; // [hl+]
+    assign r16mem_op[3] = `DEC; // [hl-]
+    wire [2:0] r16mem_rd [0:3];
+    assign r16mem_rd[0] = `bc; // [bc]
+    assign r16mem_rd[1] = `de; // [de]
+    assign r16mem_rd[2] = `hl; // [hl+]
+    assign r16mem_rd[3] = `hl; // [hl-]
+
     wire [7:0] MSB [0:3], LSB [0:3];
     assign MSB[`bc] = `b;
     assign LSB[`bc] = `c;
@@ -52,6 +63,8 @@ module ControlUnit(
     always @ ( posedge clk ) begin
         state <= next;
     end
+
+    `define executing(mnemonic) $display("%s\t-\tstate: %6b", mnemonic, state);
 
     always @* begin
         next = `s0;
@@ -85,7 +98,7 @@ module ControlUnit(
                     end
                     'b001: begin
                         // ld [imm16], sp
-                        $display("ld [imm16], sp\t-\tstate: %5b", state);
+                        `executing("ld [imm16], sp")
                         case ( state )
                         `s0: begin
                             next = `s1;
@@ -122,7 +135,7 @@ module ControlUnit(
                         endcase
                     end
                     'b010: begin
-                        $display("stop");
+                        `executing("stop")
                         // temporary (possibly incorrect) implementation of stop
                         case ( state )
                             `s0: begin
@@ -137,7 +150,7 @@ module ControlUnit(
                         endcase
                     end
                     'b011: begin
-                        $display("jr imm8");
+                        `executing("jr imm8")
                         case ( state )
                         `s0: begin
                             next = `s1;
@@ -166,7 +179,7 @@ module ControlUnit(
                         endcase
                     end
                     'b1xx: begin
-                        $display("jr cond, imm8");
+                        `executing("jr cond, imm8")
                         case ( state )
                         `s0: begin
                             data_sel = `din;
@@ -209,6 +222,7 @@ module ControlUnit(
                     case (IR[3])
                     0: begin
                         // ld r16, imm16
+                        `executing("ld r16, imm16")
                         case ( state )
                         `s0: begin
                             next = `s1;
@@ -228,6 +242,7 @@ module ControlUnit(
                     end
                     1: begin
                         // add hl, r16
+                        `executing("add hl, r16")
                         data_sel = `alu;
                         flag_mask = `fn | `fh | `fc;
                         case ( state )
@@ -256,7 +271,7 @@ module ControlUnit(
                 'b010: begin
                     case ( IR[3] )
                     0: begin
-                        $display("ld [r16mem], a");
+                        `executing("ld [r16mem], a")
                         case ( state )
                         `s0: begin
                             next = `s1;
@@ -264,6 +279,8 @@ module ControlUnit(
                             addrl = LSB[IR[5:4]];
                             r1 = `a;
                             alu_op = `PAS;
+                            idu_op = r16mem_op[IR[5:4]];
+                            rd_idu = r16mem_rd[IR[5:4]];
                             writeback = 1;
                         end
                         `s1: begin
@@ -280,6 +297,8 @@ module ControlUnit(
                             addrh = MSB[IR[5:4]];
                             addrl = LSB[IR[5:4]];
                             data_sel = `din;
+                            idu_op = r16mem_op[IR[5:4]];
+                            rd_idu = r16mem_rd[IR[5:4]];
                             rd = `a;
                         end
                         `s1: begin
@@ -418,6 +437,9 @@ module ControlUnit(
                         fetch = 1;
                     end
                     endcase
+                end
+                'b111: begin
+                    
                 end
                 endcase
             end

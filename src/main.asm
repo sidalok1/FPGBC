@@ -10,7 +10,7 @@ ld b, 0
 ld c, 5
 ld de, -3
 ld hl, 32
-ld [hl+], a
+inc hl
 add hl, bc
 add hl, de
 dec a
