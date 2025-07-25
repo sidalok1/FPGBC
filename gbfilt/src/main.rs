@@ -1,7 +1,7 @@
 pub mod reg;
 pub mod helpers;
 
-use text_io::read;
+use std::io::{self, Write};
 
 use crate::helpers::RunState;
 
@@ -12,8 +12,18 @@ fn main() {
         imm16: false,
         imm: None
     };
+    let input = io::stdin();
+    let mut buf = String::new();
+
     loop {
-        let line: String = read!("{}\n");
-        state.decode(&line);
+        match input.read_line(&mut buf) {
+            Ok(0) |
+            Ok(1) |
+            Err(_) => break,
+            Ok(_) => println!("{}", state.decode(buf.trim()))
+        }
+        buf.clear();
+        io::stdout().flush().expect("should not happen");
     }
+
 }

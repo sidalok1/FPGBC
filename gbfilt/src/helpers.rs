@@ -89,27 +89,32 @@ macro_rules! unimp {
 }
 
 impl RunState {
-	pub fn decode(&mut self, inst: &str) {
-		if self.imm8 {
-			self.imm8 = false;
-			println!("{inst}");
-		} else if self.imm16 {
-			match &self.imm {
-				Some(s) => {
-					println!("{}{}", s, inst);
-					self.imm16 = false;
-					self.imm = None;
-				},
-				None => {
-					self.imm = Some(String::from(inst))
-				}
-			}
-		} else if self.prefix {
-			self.prefix = false;
-			println!("Prefixed insts not implemented");
-		} else {
-			println!("{}", self.decode_xxxxxxxx(hex_to_u8(inst)));
-		}
+	pub fn decode(&mut self, inst: &str) -> String {
+		// if self.imm8 {
+		// 	self.imm8 = false;
+		// 	String::from(inst)
+		// } else if self.imm16 {
+		// 	match &self.imm {
+		// 		Some(s) => {
+		// 			let imm_str = format!("{}{}", s, inst);
+		// 			self.imm16 = false;
+		// 			self.imm = None;
+		// 			imm_str
+		// 		},
+		// 		None => {
+		// 			self.imm = Some(String::from(inst));
+		// 			String::new()
+		// 		}
+		// 	}
+		// } else if self.prefix {
+		// 	self.prefix = false;
+		// 	String::from("Prefixed insts not implemented")
+		// } else {
+		// 	format!("{}", self.decode_xxxxxxxx(hex_to_u8(inst)))
+		// }
+		// IR register holds only instructions, not immediates
+		// The prefix part might still be necessary in the future
+		format!("{}", self.decode_xxxxxxxx(hex_to_u8(inst)))
 	}
 
 	fn decode_xxxxxxxx(&mut self, inst: u8) -> Instruction {

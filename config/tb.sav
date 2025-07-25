@@ -1,9 +1,9 @@
 [*]
 [*] GTKWave Analyzer v3.3.116 (w)1999-2023 BSI
-[*] Fri Jul 25 00:38:55 2025
+[*] Fri Jul 25 03:15:41 2025
 [*]
 [dumpfile] "./_out/waveform.fst"
-[dumpfile_mtime] "Fri Jul 25 00:38:26 2025"
+[dumpfile_mtime] "Fri Jul 25 03:15:21 2025"
 [dumpfile_size] 3148
 [savefile] "./config/tb.sav"
 [timestart] 0
@@ -20,7 +20,8 @@
 tb_core.clk
 @800200
 -Core
-@23
+@4023
+^>1 ./gbfilt/target/release/gbfilt
 tb_core.UUT.IR[7:0]
 @22
 tb_core.UUT.addrbus[15:0]
