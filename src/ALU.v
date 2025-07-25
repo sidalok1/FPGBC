@@ -1,11 +1,11 @@
 `include "ALU_headers.vh"
 
 module ALU ( op, in1, in2, out, carry_in, flags_out );
-    input [`OPWIDTH:0] op;
+    input [`ALU_opwidth:0] op;
     input [7:0] in1, in2;
     input carry_in;
     output wire [7:0] out;
-    output wire flags_out;
+    output wire [3:0] flags_out;
     
     reg z, n, c, h;
     assign flags_out = {z, n, c, h};
@@ -16,8 +16,8 @@ module ALU ( op, in1, in2, out, carry_in, flags_out );
     assign out = full_result[7:0];
 
     always @( op, in1, in2 ) begin
-
         case (op) 
+        `PAS: full_result[7:0] <= in1;
         `ADD: begin
             full_result = in1 + in2;
             half_result = in1[3:0] + in2[3:0];

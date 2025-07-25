@@ -82,4 +82,8 @@ SM83.xpr
 **.vvp
 **.fst
 **.out
-**.sav
+# **.sav
+.vscode
+**.mem
+
+gbfilt/target/

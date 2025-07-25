@@ -1,10 +1,11 @@
 `ifndef ALU_H
 `define ALU_H
 
-`define OPWIDTH 3
+`define ALU_opwidth 3
 
-`define ADD 0
-`define ADC 1
-`define SUB 2
+`define PAS 0
+`define ADD 1
+`define ADC 2
+`define SUB 3
 
 `endif
