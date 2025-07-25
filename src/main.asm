@@ -10,13 +10,12 @@ ld b, 0
 ld c, 5
 ld de, -3
 ld hl, 32
-dec a
 ld [hl+], a
 add hl, bc
-ld [hl-], a
 add hl, de
+dec a
 jr 3
 inc bc
 dec de
-jr nz, -8
+jr nz, -6
 stop

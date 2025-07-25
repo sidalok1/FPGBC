@@ -44,7 +44,7 @@ module tb_core();
         // UUT.regfile.r8[10] = 8'hab;
         // UUT.regfile.r8[11] = 8'hcd;
 
-        $readmemb("test/rom.mem", memory.mem);
+        $readmemh("test/rom.mem", memory.mem);
 
         for (i = 0; i < 16; i = i + 1) begin
             $dumpvars(0, tb_core.UUT.regfile.r8[i]);
@@ -55,7 +55,7 @@ module tb_core();
 
 
         // runtime
-        #150 $finish();
+        #5_000 $finish();
 
     end
 
