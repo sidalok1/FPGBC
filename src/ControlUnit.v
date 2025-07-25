@@ -66,6 +66,7 @@ module ControlUnit(
         rd_idu = `ff; // ignore writes to ff
         alu_op = `PAS;
         idu_op = `INC;
+        cc = 0;
         flag_mask = 0;
         data_sel = `din;
         // begin state logic
@@ -123,10 +124,17 @@ module ControlUnit(
                     'b010: begin
                         $display("stop");
                         // temporary (possibly incorrect) implementation of stop
-                        if ( wake ) begin
-                            rd_idu = `pc;
-                            fetch = 1;
-                        end
+                        case ( state )
+                            `s0: begin
+                                if ( wake ) begin
+                                    rd_idu = `pc;
+                                    fetch = 1;
+                                end else begin
+                                    next = `s1;
+                                end
+                            end
+                            `s1: $finish();
+                        endcase
                     end
                     'b011: begin
                         $display("jr imm8");
@@ -155,40 +163,44 @@ module ControlUnit(
                             rd_idu = `pc;
                             fetch = 1;
                         end
-                        'b1xx: begin
-                            $display("jr cond, imm8");
-                            case ( state )
-                            `s0: begin
+                        endcase
+                    end
+                    'b1xx: begin
+                        $display("jr cond, imm8");
+                        case ( state )
+                        `s0: begin
+                            data_sel = `din;
+                            rd = `z;
+                            rd_idu = `pc;
+                            cc = IR[4:3];
+                            if ( cc_true ) begin
+                                next = `s2;
+                            end else begin
                                 next = `s1;
-                                data_sel = `din;
-                                rd = `z;
-                                rd_idu = `pc;
                             end
-                            `s1: begin
-                                data_sel = `din;
-                                rd = `w;
-                                rd_idu = `pc;
-                                cc = IR[4:3];
-                                if ( cc_true ) begin
-                                    next = `s2;
-                                end else begin
-                                    next = `s3;
-                                end
-                            end
-                            `s2: begin
-                                next = `s3;
-                                addrh = `w;
-                                addrl = `z;
-                                idu_op = `PAS;
-                                rd_idu = `pc;
-                            end
-                            `s3: begin
-                                rd_idu = `pc;
-                                fetch = 1;
-                            end
-                            endcase
                         end
-                        default:;
+                        `s1: begin
+                            rd_idu = `pc;
+                            fetch = 1;
+                        end
+                        `s2: begin
+                            next = `s3;
+                            data_sel = `alu;
+                            alu_op = `ADD;
+                            r1 = `pcl;
+                            r2 = `z;
+                            rd = `z;
+                            idu_op = `ADJ;
+                            addrl = `pch;
+                            addrh = `ctr;
+                            ctr = 8'b0;
+                        end
+                        `s3: begin
+                            addrh = `w;
+                            addrl = `z;
+                            rd_idu = `pc;
+                            fetch = 1;
+                        end
                         endcase
                     end
                     endcase

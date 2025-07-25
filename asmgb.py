@@ -66,6 +66,9 @@ def immToBits(imm: str, bytes = 2):
 	else: raise ValueError(f"Immediate must be 1 or 2 bytes, not {value}")
 	return tuple(int(bit) for bit in bitstring)
 
+def bintohex(s):
+	return f"{int(s, base=2):02X}"
+
 def main():
 	parser = argparse.ArgumentParser(description="Translate GB ASM to .mem")
 	parser.add_argument('file', nargs=1, type=argparse.FileType(mode="r"), help='GB ASM file to translate')
@@ -126,11 +129,11 @@ def main():
 					if len(words) == 2:
 						if not words[1].strip('-').isdigit():
 							raise ParseError(line, lineno, line.rfind(words[1]) + 1, "Expected a decimal number as operand")
-						bitstream.extend([0, 0, 0, 1, 1, 0, 0, 0, *immToBits(words[1], 1)])
+						bitstream.extend([0, 0, 0, 1, 1, 0, 0, 0, *immToBits(f"{int(words[1])-1}", 1)])
 					elif len(words) == 3:
 						if not words[2].strip('-').isdigit():
 							raise ParseError(line, lineno, line.rfind(words[2]) + 1, "Expected a decimal number as operand")
-						bitstream.extend([0, 0, 1, *cond[words[1].strip(',')], 0, 0, 0, *immToBits(words[2], 1)])
+						bitstream.extend([0, 0, 1, *cond[words[1].strip(',')], 0, 0, 0, *immToBits(f"{int(words[2])-1}", 1)])
 					elif len(words) < 2:
 						raise ParseError(line, lineno, None, "Not enough operands")
 					elif len(words) > 3:
@@ -163,7 +166,7 @@ def main():
 						bitstream.extend([0, 0, *r16[words[1]], 1, 0, 1, 1])
 			lineno += 1
 		bytestream = [bitstream[i:i+8] for i in range(0, len(bitstream), 8)]
-		bytestrings = ["".join([str(bit) for bit in byte]) + '\n' for byte in bytestream]
+		bytestrings = [bintohex("".join([str(bit) for bit in byte])) + '\n' for byte in bytestream]
 		with args.o[0] as out:
 			out: io.TextIOWrapper
 			out.writelines(bytestrings)
