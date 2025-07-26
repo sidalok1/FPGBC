@@ -89,10 +89,19 @@ def main():
 						raise ParseError(line, lineno, None, "Not enough operands")
 					if len(words) > 3:
 						raise ParseError(line, lineno, line.rfind(words[3]) + 1, "Too many operands")
-					if words[1].startswith('['):
+					if words[1].strip(',') in r8.keys():
+						if words[2] in r16.keys():
+							if not words[2].startswith('[') or not words[2].endswith(']'):
+								raise ParseError(line, lineno, line.rfind(words[2]) + 1, "Second operand must be r16 relative")
+							if words[1].strip(',') != "a":
+								raise ParseError(line, lineno, line.rfind(words[1]) + 1, "not implemented")
+							bitstream.extend([0, 0, *r16[words[2]], 1, 0, 1, 0])
+						else:
+							bitstream.extend([0, 0, *r8[words[1].strip(',')], 1, 1, 0, *immToBits(words[2], 1)])
+					elif words[1].startswith('['):
 						if not words[1].strip(',').endswith(']'):
 							raise ParseError(line, lineno, line.rfind(words[1]) + len(words[1]), "Expected ']' at end of operand")
-						if words[1].strip(',') in r16:
+						if words[1].strip(',') in r16.keys():
 							if words[2] != "a":
 								raise ParseError(line, lineno, line.rfind(words[2]) + 1, "Expected 'a' as second operand")
 							bitstream.extend([0, 0, *r16[words[1].strip(',')], 0, 0, 1, 0])
@@ -102,19 +111,10 @@ def main():
 							bitstream.extend([0, 0, 0, 0, 1, 0, 0, 0, *immToBits(words[1].strip("[],"))])
 						else:
 							raise ParseError(line, lineno, line.rfind(words[1]) + 2, "Memory index must be r16 relative of decimal direct")
-					elif words[1].strip(',') in r16:
+					elif words[1].strip(',') in r16.keys():
 						if not words[2].lstrip('-').isdigit():
 							raise ParseError(line, lineno, line.rfind(words[2]) + 1, "Expected a decimal number as second operand")
 						bitstream.extend([0, 0, *r16[words[1].strip(',')], 0, 0, 0, 1, *immToBits(words[2])])
-					elif words[1].strip(',') in r8:
-						if words[2] in r16:
-							if not words[2].startswith('[') or not words[2].endswith(']'):
-								raise ParseError(line, lineno, line.rfind(words[2]) + 1, "Second operand must be r16 relative")
-							if words[1].strip(',') != "a":
-								raise ParseError(line, lineno, line.rfind(words[1]) + 1, "not implemented")
-							bitstream.extend([0, 0, *r16[words[2]], 1, 0, 1, 0])
-						else:
-							bitstream.extend([0, 0, *r8[words[1].strip(',')], 1, 1, 0, *immToBits(words[2], 1)])
 				case 'add':
 					if len(words) < 3:
 						raise ParseError(line, lineno, None, "Not enough operands")
@@ -122,18 +122,18 @@ def main():
 						raise ParseError(line, lineno, line.rfind(words[3]) + 1, "Too many operands")
 					if words[1].strip(',') != "hl":
 						raise ParseError(line, lineno, line.rfind(words[1]) + 1, "Expected 'hl' as first operand")
-					if words[2].strip(',') not in r16:
+					if words[2].strip(',') not in r16.keys():
 						raise ParseError(line, lineno, line.rfind(words[1]) + 1, "Expected one of 'bc', 'de', 'hl', 'sp' as second operand")
 					bitstream.extend([0, 0, *r16[words[2]], 1, 0, 0, 1])
 				case "jr":
 					if len(words) == 2:
 						if not words[1].strip('-').isdigit():
 							raise ParseError(line, lineno, line.rfind(words[1]) + 1, "Expected a decimal number as operand")
-						bitstream.extend([0, 0, 0, 1, 1, 0, 0, 0, *immToBits(f"{int(words[1])-1}", 1)])
+						bitstream.extend([0, 0, 0, 1, 1, 0, 0, 0, *immToBits(f"{int(words[1])}", 1)])
 					elif len(words) == 3:
 						if not words[2].strip('-').isdigit():
 							raise ParseError(line, lineno, line.rfind(words[2]) + 1, "Expected a decimal number as operand")
-						bitstream.extend([0, 0, 1, *cond[words[1].strip(',')], 0, 0, 0, *immToBits(f"{int(words[2])-1}", 1)])
+						bitstream.extend([0, 0, 1, *cond[words[1].strip(',')], 0, 0, 0, *immToBits(f"{int(words[2])}", 1)])
 					elif len(words) < 2:
 						raise ParseError(line, lineno, None, "Not enough operands")
 					elif len(words) > 3:
@@ -151,19 +151,51 @@ def main():
 						raise ParseError(line, lineno, None, "Not enough operands")
 					elif len(words) > 2:
 						raise ParseError(line, lineno, line.rfind(words[2]) + 1, "Too many operands")
-					elif words[1] in r8:
+					elif words[1] in r8.keys():
 						bitstream.extend([0, 0, *r8[words[1]], 1, 0, 0])
-					elif words[1] in r16:
+					elif words[1] in r16.keys():
 						bitstream.extend([0, 0, *r16[words[1]], 0, 0, 1, 1])
 				case "dec":
 					if len(words) < 2:
 						raise ParseError(line, lineno, None, "Not enough operands")
 					elif len(words) > 2:
 						raise ParseError(line, lineno, line.rfind(words[2]) + 1, "Too many operands")
-					elif words[1] in r8:
+					elif words[1] in r8.keys():
 						bitstream.extend([0, 0, *r8[words[1]], 1, 0, 1])
-					elif words[1] in r16:
+					elif words[1] in r16.keys():
 						bitstream.extend([0, 0, *r16[words[1]], 1, 0, 1, 1])
+				case "rlca":
+					if len(words) > 1:
+						raise ParseError(line, lineno, line.rfind(words[2]) + 1, "Too many operands")
+					bitstream.extend([0, 0, 0, 0, 0, 1, 1, 1])
+				case "rrca":
+					if len(words) > 1:
+						raise ParseError(line, lineno, line.rfind(words[2]) + 1, "Too many operands")
+					bitstream.extend([0, 0, 0, 0, 1, 1, 1, 1])
+				case "rla":
+					if len(words) > 1:
+						raise ParseError(line, lineno, line.rfind(words[2]) + 1, "Too many operands")
+					bitstream.extend([0, 0, 0, 1, 0, 1, 1, 1])
+				case "rra":
+					if len(words) > 1:
+						raise ParseError(line, lineno, line.rfind(words[2]) + 1, "Too many operands")
+					bitstream.extend([0, 0, 0, 1, 1, 1, 1, 1])
+				case "daa":
+					if len(words) > 1:
+						raise ParseError(line, lineno, line.rfind(words[2]) + 1, "Too many operands")
+					bitstream.extend([0, 0, 1, 0, 0, 1, 1, 1])
+				case "cpl":
+					if len(words) > 1:
+						raise ParseError(line, lineno, line.rfind(words[2]) + 1, "Too many operands")
+					bitstream.extend([0, 0, 1, 0, 1, 1, 1, 1])
+				case "scf":
+					if len(words) > 1:
+						raise ParseError(line, lineno, line.rfind(words[2]) + 1, "Too many operands")
+					bitstream.extend([0, 0, 1, 1, 0, 1, 1, 1])
+				case "ccf":
+					if len(words) > 1:
+						raise ParseError(line, lineno, line.rfind(words[2]) + 1, "Too many operands")
+					bitstream.extend([0, 0, 1, 1, 1, 1, 1, 1])
 			lineno += 1
 		bytestream = [bitstream[i:i+8] for i in range(0, len(bitstream), 8)]
 		bytestrings = [bintohex("".join([str(bit) for bit in byte])) + '\n' for byte in bytestream]

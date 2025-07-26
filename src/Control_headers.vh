@@ -9,6 +9,7 @@
 `define fn 5'b10100
 `define fh 5'b10010
 `define fc 5'b10001
+`define fAll 5'b11111
 
 // data bus in select
 `define din 0
@@ -24,4 +25,8 @@
 `define max_state 5;
 
 `define INVALID_STATE(mnemonic) $display("---\nERROR\ninstruction:\n\t%s\nhas no defined state:\n\t%d\n", mnemonic, state);
+
+`define executing(mnemonic) $display("%s\t-\tstate: %6b", mnemonic, state);
+
+
 `endif

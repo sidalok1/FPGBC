@@ -11,8 +11,8 @@
 `define RLC 'b1000
 `define RRC 'b1001
 `define RL  'b1010
-`define RC  'b1011
-`define DA  'b1100
+`define RR  'b1011
+`define DAA 'b1100
 `define CPL 'b1101
 `define SCF 'b1110
 `define CCF 'b1111

@@ -60,11 +60,19 @@ module ControlUnit(
     assign MSB[`sp] = `sph;
     assign LSB[`sp] = `spl;
 
+    wire [7:0] MSBm [0:3], LSBm [0:3];
+    assign MSBm[0] = `b;
+    assign LSBm[0] = `c;
+    assign MSBm[1] = `d;
+    assign LSBm[1] = `e;
+    assign MSBm[2] = `h;
+    assign LSBm[2] = `l;
+    assign MSBm[3] = `h;
+    assign LSBm[3] = `l;
+
     always @ ( posedge clk ) begin
         state <= next;
     end
-
-    `define executing(mnemonic) $display("%s\t-\tstate: %6b", mnemonic, state);
 
     always @* begin
         next = `s0;
@@ -116,8 +124,8 @@ module ControlUnit(
             case ( state )
             `s0: begin
                 next = `s1;
-                addrh = MSB[IR[5:4]];
-                addrl = LSB[IR[5:4]];
+                addrh = MSBm[IR[5:4]];
+                addrl = LSBm[IR[5:4]];
                 r1 = `a;
                 alu_op = `PAS;
                 idu_op = r16mem_op[IR[5:4]];
@@ -161,7 +169,7 @@ module ControlUnit(
                     r2 = `one;
                     alu_op = `ADD;
                     data_sel = `alu;
-                    flag_mask = `fz | `fn | `fh;
+                    flag_mask = `fz | `fn | `fh ;
                 end
             end
             `s1: begin
@@ -169,8 +177,10 @@ module ControlUnit(
                 addrh = `h;
                 addrl = `l;
                 alu_op = `ADD;
+                data_sel = `alu;
                 r1 = `z;
                 r2 = `one;
+                flag_mask = `fz | `fn | `fh ;
                 writeback = 1;
             end
             `s2: begin
@@ -195,7 +205,7 @@ module ControlUnit(
                     r2 = `one;
                     alu_op = `SUB;
                     data_sel = `alu;
-                    flag_mask = `fz | `fn | `fh;
+                    flag_mask = `fz | `fn | `fh ;
                 end
             end
             `s1: begin
@@ -203,8 +213,10 @@ module ControlUnit(
                 addrh = `h;
                 addrl = `l;
                 alu_op = `SUB;
+                data_sel = `alu;
                 r1 = `z;
                 r2 = `one;
+                flag_mask = `fz | `fn | `fh ;
                 writeback = 1;
             end
             `s2: begin
@@ -242,11 +254,58 @@ module ControlUnit(
         'b00_xxx_111: begin
             r1 = `a;
             r2 = `ctr;
+            data_sel = `alu;
             ctr = `a;
-            rd = `a;
-            alu_op = {1'b1, IR[5:3]};
             rd_idu = `pc;
             fetch = 1;
+            case ( IR[5:3] )
+            'b000: begin
+                `executing("rlca")
+                rd = `a;
+                alu_op = `RLC;
+                flag_mask = `fAll;
+            end
+            'b001: begin
+                `executing("rrca")
+                rd = `a;
+                alu_op = `RRC;
+                flag_mask = `fAll;
+            end
+            'b010: begin
+                `executing("rla")
+                rd = `a;
+                alu_op = `RL;
+                flag_mask = `fAll;
+            end
+            'b011: begin
+                `executing("rra")
+                rd = `a;
+                alu_op = `RR;
+                flag_mask = `fAll;
+            end
+            'b100: begin
+                `executing("daa")
+                rd = `a;
+                alu_op = `DAA;
+                flag_mask = `fz | `fh | `fc ;
+            end
+            'b101: begin
+                `executing("cpl")
+                rd = `a;
+                alu_op = `CPL;
+                flag_mask = `fn | `fh ;
+            end
+            'b110: begin
+                `executing("scf")
+                alu_op = `SCF;
+                flag_mask = `fz | `fh | `fc ;
+            end
+            'b111: begin
+                `executing("ccf")
+                alu_op = `CCF;
+                flag_mask = `fz | `fh | `fc ;
+            end
+            endcase
         end
         'b00_001_000: begin
             `executing("ld [imm16], sp")
@@ -287,7 +346,7 @@ module ControlUnit(
         'b00_xx1_001: begin
             `executing("add hl, r16")
             data_sel = `alu;
-            flag_mask = `fn | `fh | `fc;
+            flag_mask = `fn | `fh | `fc ;
             case ( state )
             `s0: begin
                 next = `s1;
@@ -314,8 +373,8 @@ module ControlUnit(
             case ( state )
             `s0: begin
                 next = `s1;
-                addrh = MSB[IR[5:4]];
-                addrl = LSB[IR[5:4]];
+                addrh = MSBm[IR[5:4]];
+                addrl = LSBm[IR[5:4]];
                 data_sel = `din;
                 idu_op = r16mem_op[IR[5:4]];
                 rd_idu = r16mem_rd[IR[5:4]];

@@ -1,5 +1,3 @@
-# use asmgb.py to compiler (link) this file
-
 # Tests for block 00 control flow
 
 # passing if a == 0 on stop inst
@@ -26,3 +24,5 @@ dec b
 jr z, 1
 dec a
 stop
+
+# PASSING

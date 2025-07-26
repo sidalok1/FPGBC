@@ -145,6 +145,7 @@ impl RunState {
 					itype: Load8bit
 				}
 			}
+			0b111 => self.decode_00_xxx_111(inst),
 			_ => unimp!(inst)
 		}
 	}
@@ -226,6 +227,23 @@ impl RunState {
 				itype: Arith16bit
 			},
 			_ => invalid!(inst)
+		}
+	}
+
+	fn decode_00_xxx_111(&mut self, inst: u8) -> Instruction {
+		Instruction { 
+			mnemonic: String::from(match getbits(inst, 5, 3) {
+				0b000 => "rlca",
+				0b001 => "rrca",
+				0b010 => "rla",
+				0b011 => "rra",
+				0b100 => "daa",
+				0b101 => "cpl",
+				0b110 => "scf",
+				0b111 => "ccf",
+				_ => panic!("getbits returned more than 3 bit uint!")
+			}), 
+			itype: Arith8bit 
 		}
 	}
 

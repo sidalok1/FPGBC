@@ -45,6 +45,45 @@ is the Digilent cmod-a7.
 	|...					<- Repo specific files
 ```
 
+### ISA
+
+#### Operations tested
+
+- nop
+- stop*
+
+- ld r16, imm16
+- ld [r16mem], a
+- ld a, [r16mem]
+- ld [imm16], sp
+- ld r8, imm8
+- inc r8
+- dec r8
+- inc r16
+- dec r16
+- add hl, r16
+
+- rlca
+- rrca
+- rla
+- rra
+- cpl
+- scf
+- ccf
+
+- jr imm8
+- jr cond, imm8
+
+#### Operations implemented
+
+
+
+#### Operations todo next
+
+- daa
+
+*implementation may not be correct
+
 ### Modules
 
 #### Dependancies

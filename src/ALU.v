@@ -9,7 +9,7 @@ module ALU ( op, in1, in2, out, carry_in, flags_out );
     output wire [3:0] flags_out;
     
     reg z = 0, n = 0, c = 0, h = 0;
-    assign flags_out = {z, n, c, h};
+    assign flags_out = {z, n, h, c};
 
     reg [8:0] full_result = 0;
     reg [4:0] half_result = 0;
@@ -64,7 +64,7 @@ module ALU ( op, in1, in2, out, carry_in, flags_out );
             h = 0;
             c = in1[7];
         end
-        `RC: begin
+        `RR: begin
             full_result = {1'b0, carry_in, in1[7:1]};
             z = (in2 == `a) ? 0 : full_result[7:0] == 0;
             n = 0;
