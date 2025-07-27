@@ -1,28 +1,52 @@
 # use asmgb.py to compiler (link) this file
 
-# Tests for block 00 control flow
+# block 00 test
 
-# passing if a == 0 on stop inst
+test:
+	ld a, 0
+	rlca
+	jr c, fail
+	jr z, fail
+	ld a, 0b10000000
+	rlca
+	jr nc, fail
+	ccf
+	jr c, fail
+	rla
+	scf
+	rra
+	scf
+	rrca
+	jr nc, fail
+	ld a, -1
+	cpl
+	inc a
+	jr z, fail
+	dec a
+	jr nz, fail
+	ld bc, 0x0100
+	ld de, 0
+	inc bc
+	dec de
+	ld hl, 0
+	add hl, bc
+	add hl, de
+	ld a, 1
+	ld [hl+], a
+	dec hl
+	dec [hl]
+	jr z, pass
+	jr nz, fail
 
-jr 0
-jr 1
-dec a
-jr 4
-dec a
-jr 3
-dec a
-jr -5
-scf
-jr c, 1
-dec a
-scf
-ccf
-jr nc, 1
-dec a
-inc b
-jr nz, 1
-dec a
-dec b
-jr z, 1
-dec a
-stop
+fail:
+	ld a, 0
+	stop
+
+pass:
+	ld a, 0xff
+	jr done
+	scf
+	jr c, fail
+
+done:
+	stop

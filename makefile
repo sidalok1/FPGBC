@@ -2,6 +2,7 @@ TOP=tb_core.v
 # SAVE=config/reg.sav
 SAVE=config/tb.sav
 VPATH=src:test
+PYTHON=./.venv/bin/python3
 
 default: sim
 
@@ -29,8 +30,8 @@ _out/run.vvp: $(wildcard src/*.v) $(wildcard test/*.v) test/rom.mem _out
 _out:
 	mkdir _out
 
-test/rom.mem: src/main.asm asmgb.py
-	python ./asmgb.py src/main.asm -o test/rom.mem
+test/rom.mem: src/main.asm $(wildcard asmgb/*.py) asmgb/gb.lark
+	$(PYTHON) ./asmgb/asmgb.py src/main.asm -o test/rom.mem
 
 clean:
 	rm -rf _out

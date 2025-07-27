@@ -1,0 +1,106 @@
+?program		:	line_list
+line_list		:	_line+
+_line			:	SH_COMMENT
+				|	instruction
+				|	label
+				|	_label_inst
+
+_label_inst		:	label instruction
+label			:	LABEL
+LABEL.-1		: 	CNAME ":"
+
+instruction		:	_mnemonic SH_COMMENT?
+_mnemonic		:	increment
+				|	decrement
+				|	jump_rel
+				|	load_imm16
+				|	load_imm8
+				|	load_r16_a
+				|	load_a_r16
+				|	load_dir_sp
+				|	add_hl_r16
+				|	jump_rel_cd
+				|	NOP
+				|	RLCA
+				|	RRCA
+				|	RLA
+				|	RRA
+				|	DAA
+				|	CPL
+				|	SCF
+				|	CCF
+				|	STOP
+
+increment		:	INC (r16 | r8)
+decrement		:	DEC (r16 | r8)
+jump_rel		:	JR (_imm | CNAME)
+
+load_imm16		:	LD r16 ","? _imm
+load_imm8		:	LD r8 ","? _imm
+load_r16_a		:	LD "[" r16mem "]" ","? A
+load_a_r16		:	LD A ","? "[" r16mem "]"
+load_dir_sp		:	LD _direct ","? SP
+add_hl_r16		:	ADD HL ","? r16
+jump_rel_cd		:	JR COND ","? (_imm | CNAME)
+
+NOP				:	"nop"
+STOP			:	"stop"
+RLCA			:	"rlca"
+RRCA			:	"rrca"
+RLA				:	"rla"
+RRA				:	"rra"
+DAA				:	"daa"
+CPL				:	"cpl"
+SCF				:	"scf"
+CCF				:	"ccf"
+INC				:	"inc"
+DEC				:	"dec"
+JR				:	"jr"
+LD				:	"ld"
+ADD				:	"add"
+
+_direct			: 	"[" _imm "]"
+
+r8				: 	B |	C |	D |	E |	H |	L | HLR8 | A
+B				:	"b"i
+C				:	"c"i
+D				:	"d"i
+E				:	"e"i
+H				:	"h"i
+L				:	"l"i
+HLR8			:	"[hl]"i
+A				:	"a"i
+
+r16				:	BC | DE	| HL | SP
+r16mem			:	BC | DE | HLI | HLD
+BC				:	"bc"i
+DE				:	"de"i
+HL				:	"hl"i
+SP				:	"sp"i
+HLI				:	"hl+"i | "hli"i
+HLD				:	"hl-"i | "hld"i
+
+COND			:	"z"i
+				| 	"nz"i
+				| 	"c"i
+				| 	"nc"i
+
+_imm				:	DECNUM | _hex | _bin
+DECNUM			:	INT | SIGNED_INT
+_hex				:	"0x" HEXNUM
+HEXNUM			:	HEXDIGIT+
+_bin				:	"0b" BINNUM
+BINNUM			:	("0" | "1")+
+
+
+
+%import common.DIGIT
+%import common.HEXDIGIT
+%import common.INT
+%import common.SIGNED_INT
+%import common.SH_COMMENT
+%import common.WS
+%import common.NEWLINE
+%import common.CNAME
+%ignore SH_COMMENT
+%ignore WS

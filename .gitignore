@@ -87,3 +87,6 @@ SM83.xpr
 **.mem
 
 gbfilt/target/
+
+.venv
+**/__pycache__
