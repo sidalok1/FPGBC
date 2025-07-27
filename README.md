@@ -73,14 +73,14 @@ is the Digilent cmod-a7.
 
 - jr imm8
 - jr cond, imm8
+- daa
+
 
 #### Operations implemented
 
 
 
 #### Operations todo next
-
-- daa
 
 *implementation may not be correct
 

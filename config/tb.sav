@@ -1,15 +1,15 @@
 [*]
 [*] GTKWave Analyzer v3.3.116 (w)1999-2023 BSI
-[*] Sun Jul 27 19:24:58 2025
+[*] Sun Jul 27 20:52:19 2025
 [*]
-[dumpfile] "/home/Code/SM83/_out/waveform.fst"
-[dumpfile_mtime] "Sun Jul 27 19:18:09 2025"
-[dumpfile_size] 6354
-[savefile] "/home/Code/SM83/config/tb.sav"
-[timestart] 552390
+[dumpfile] "./_out/waveform.fst"
+[dumpfile_mtime] "Sun Jul 27 20:51:54 2025"
+[dumpfile_size] 6598
+[savefile] "./config/tb.sav"
+[timestart] 3602390
 [size] 1440 960
 [pos] 307401 295007
-*-14.284844 610000 610000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-14.284844 3660000 610000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] tb_core.
 [treeopen] tb_core.UUT.
 [sst_width] 276
@@ -21,7 +21,7 @@ tb_core.clk
 @800200
 -Core
 @c04022
-^>1 /home/Code/SM83/gbfilt/target/release/gbfilt
+^>1 ./gbfilt/target/release/gbfilt
 +{Instruction} tb_core.UUT.IR[7:0]
 @28
 (0)tb_core.UUT.IR[7:0]
@@ -35,7 +35,7 @@ tb_core.clk
 @1401200
 -group_end
 @2028
-^1 /home/Code/SM83/config/state.filt
+^1 ./config/state.filt
 +{State} tb_core.UUT.controller.state[5:0]
 @22
 +{Address Bus} tb_core.UUT.addrbus[15:0]
@@ -47,11 +47,11 @@ tb_core.UUT.write_mem
 @1000200
 -Core
 @2022
-^2 /home/Code/SM83/config/reg8.filt
+^2 ./config/reg8.filt
 tb_core.UUT.controller.r1[3:0]
-^2 /home/Code/SM83/config/reg8.filt
+^2 ./config/reg8.filt
 tb_core.UUT.controller.r2[3:0]
-^2 /home/Code/SM83/config/reg8.filt
+^2 ./config/reg8.filt
 tb_core.UUT.controller.rd[3:0]
 @800200
 -Registers
@@ -143,7 +143,7 @@ tb_core.UUT.regfile.\r8[11][7:0]
 @800200
 -ALU
 @2022
-^3 /home/Code/SM83/config/alu.filt
+^3 ./config/alu.filt
 tb_core.UUT.alu_inst.op[3:0]
 @c00420
 tb_core.UUT.alu_inst.in1[7:0]
@@ -160,8 +160,6 @@ tb_core.UUT.alu_inst.in1[7:0]
 -group_end
 @420
 tb_core.UUT.alu_inst.in2[7:0]
-@28
-tb_core.UUT.alu_inst.carry_in
 @c00420
 tb_core.UUT.alu_inst.out[7:0]
 @28
@@ -196,7 +194,7 @@ tb_core.UUT.alu_inst.full_result[8:0]
 @22
 tb_core.UUT.idu_inst.addr_in[15:0]
 @2028
-^4 /home/Code/SM83/config/idu.filt
+^4 ./config/idu.filt
 tb_core.UUT.idu_inst.op[1:0]
 @22
 tb_core.UUT.idu_inst.out[15:0]
@@ -206,12 +204,12 @@ tb_core.UUT.idu_inst.sign
 @800200
 -Cond
 @2028
-^5 /home/Code/SM83/config/cond.filt
+^5 ./config/cond.filt
 tb_core.UUT.cond_check.cc[1:0]
 @22
 tb_core.UUT.cond_check.flags[3:0]
 @2028
-^6 /home/Code/SM83/config/bool.filt
+^6 ./config/bool.filt
 tb_core.UUT.cond_check.result
 @1000200
 -Cond

@@ -35,8 +35,23 @@ test:
 	ld [hl+], a
 	dec hl
 	dec [hl]
-	jr z, pass
+	ld a, 0x89
+	scf
+	ccf
+	jr z, bcd_loop_first
 	jr nz, fail
+
+bcd_loop_first:
+	inc a
+	daa
+	jr nc, bcd_loop_first
+	ld a, 0x11
+	ccf
+bcd_loop_second:
+	dec a
+	daa
+	jr nz, bcd_loop_second
+	jr pass
 
 fail:
 	ld a, 0

@@ -66,7 +66,7 @@ module Core( clk, din, dout, addrbus, write_mem, wake );
     
     ALU alu_inst (
         .op( sig_alu_op ),
-        .in1( alu_in1 ), .in2( alu_in2 ), .carry_in( saved_flags[0] ),
+        .in1( alu_in1 ), .in2( alu_in2 ), .flags_in( saved_flags ),
         .out( alu_out ), .flags_out( alu_flags )
     );
  
