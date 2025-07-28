@@ -38,7 +38,7 @@ module ALU ( op, in1, in2, out, flags_in, flags_out );
 
     always @( op, in1, in2, carry, offset ) begin
         case (op) 
-        `PAS: full_result[7:0] <= in1;
+        `PAS: full_result[7:0] = in1;
         `ADD: begin
             full_result = in1 + in2;
             half_result = in1[3:0] + in2[3:0];
@@ -62,6 +62,35 @@ module ALU ( op, in1, in2, out, flags_in, flags_out );
             n = 1;
             c = full_result[8];
             h = half_result[4];
+        end
+        `SBC: begin
+            full_result = in1 - in2 - carry;
+            half_result = in1[3:0] - in2[3:0] - carry;
+            z = full_result[7:0] == 0;
+            n = 1;
+            c = full_result[8];
+            h = half_result[4];
+        end
+        `AND: begin
+            full_result = {1'b0, in1 & in2};
+            z = full_result == 0;
+            n = 0;
+            h = 1;
+            c = 0;
+        end
+        `XOR: begin
+            full_result = {1'b0, in1 ^ in2};
+            z = full_result == 0;
+            n = 0;
+            h = 0;
+            c = 0;
+        end
+        `OR: begin
+            full_result = {1'b0, in1 | in2};
+            z = full_result == 0;
+            n = 0;
+            h = 1;
+            c = 0;
         end
         `RLC: begin
             full_result = {1'b0, in1[6:0], in1[7]};

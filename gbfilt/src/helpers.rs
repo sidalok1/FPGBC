@@ -121,6 +121,7 @@ impl RunState {
 		match getbits(inst, 7, 6) {
 			0b00 => self.decode_00_xxxxxx(inst),
 			0b01 => self.decode_01_xxxxxx(inst),
+			0b10 => self.decode_10_xxx_xxx(inst),
 			_ => unimp!(inst)
 		}
 	}
@@ -266,6 +267,26 @@ impl RunState {
 					R8::r8(getbits(inst, 2, 0))
 				), 
 			itype: Load8bit
+		}
+	}
+
+	fn decode_10_xxx_xxx(&mut self, inst: u8) -> Instruction {
+		Instruction { 
+			mnemonic: format!("{} a, {}",
+				match getbits(inst, 5, 3) {
+					0b000 => "add",
+					0b001 => "adc",
+					0b010 => "sub",
+					0b011 => "sbc",
+					0b100 => "and",
+					0b101 => "xor",
+					0b110 => "or",
+					0b111 => "cp",
+					_ => panic!("Should not happen!")
+				},
+				R8::r8(getbits(inst, 2, 0))
+			), 
+			itype: Arith8bit
 		}
 	}
 

@@ -14,7 +14,7 @@ module IDU(
 
     always @( addr_in, op, sign, carry ) begin
         case ( op )
-        `PAS: out = addr_in;
+        `ZER: out = addr_in;
         `INC: out = addr_in + 1;
         `DEC: out = addr_in - 1;
         `ADJ: out = 

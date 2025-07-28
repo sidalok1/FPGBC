@@ -40,8 +40,8 @@ module ControlUnit(
     reg IME;
 
     wire [`IDU_opwidth:0] r16mem_op [0:3];
-    assign r16mem_op[0] = `PAS; // [bc]
-    assign r16mem_op[1] = `PAS; // [de]
+    assign r16mem_op[0] = `ZER; // [bc]
+    assign r16mem_op[1] = `ZER; // [de]
     assign r16mem_op[2] = `INC; // [hl+]
     assign r16mem_op[3] = `DEC; // [hl-]
     wire [2:0] r16mem_rd [0:3];
@@ -261,50 +261,27 @@ module ControlUnit(
             ctr = `a;
             rd_idu = `pc;
             fetch = 1;
-            case ( IR[5:3] )
-            'b000: begin
-                `executing("rlca")
+            casex ( IR[5:3] )
+            'b0xx: begin
                 rd = `a;
-                alu_op = `RLC;
-                flag_mask = `fAll;
-            end
-            'b001: begin
-                `executing("rrca")
-                rd = `a;
-                alu_op = `RRC;
-                flag_mask = `fAll;
-            end
-            'b010: begin
-                `executing("rla")
-                rd = `a;
-                alu_op = `RL;
-                flag_mask = `fAll;
-            end
-            'b011: begin
-                `executing("rra")
-                rd = `a;
-                alu_op = `RR;
+                alu_op = {2'b01, IR[5:3]};
                 flag_mask = `fAll;
             end
             'b100: begin
-                `executing("daa")
                 rd = `a;
                 alu_op = `DAA;
                 flag_mask = `fz | `fh | `fc ;
             end
             'b101: begin
-                `executing("cpl")
                 rd = `a;
                 alu_op = `CPL;
                 flag_mask = `fn | `fh ;
             end
             'b110: begin
-                `executing("scf")
                 alu_op = `SCF;
                 flag_mask = `fz | `fh | `fc ;
             end
             'b111: begin
-                `executing("ccf")
                 alu_op = `CCF;
                 flag_mask = `fz | `fh | `fc ;
             end
@@ -528,6 +505,46 @@ module ControlUnit(
             `s2: begin
                 fetch = 1;
                 rd_idu = `pc;
+            end
+            endcase
+        end
+        'b10_xxx_xxx: begin
+            case ( state )
+            `s0: begin
+                if ( IR[2:0] == 'b110 ) begin
+                    next = `s1;
+                    rd = `z;
+                    addrh = `h;
+                    addrl = `l;
+                    data_sel = `din;
+                end else begin
+                    r1 = `a;
+                    r2 = IR[2:0];
+                    data_sel = `alu;
+                    if ( IR[5:3] == 'b111 ) begin
+                        alu_op = `SUB;
+                    end else begin
+                        alu_op = {2'b00, IR[5:3]};
+                        rd = `a; 
+                    end
+                    flag_mask = `fAll;
+                    rd_idu = `pc;
+                    fetch = 1;
+                end
+            end
+            `s1: begin
+                r1 = `a;
+                r2 = `z;
+                data_sel = `alu;
+                if ( IR[5:3] == 'b111 ) begin
+                    alu_op = `SUB;
+                end else begin
+                    alu_op = {2'b00, IR[5:3]};
+                    rd = `a; 
+                end
+                flag_mask = `fAll;
+                rd_idu = `pc;
+                fetch = 1;
             end
             endcase
         end

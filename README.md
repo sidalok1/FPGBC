@@ -75,6 +75,17 @@ is the Digilent cmod-a7.
 - jr cond, imm8
 - daa
 
+- ld r8, r8
+- halt*
+
+- add a, r8
+- adc a, r8
+- sub a, r8
+- sbc a, r8
+- and a, r8
+- xor a, r8
+- or a, r8
+- cp a, r8
 
 #### Operations implemented
 

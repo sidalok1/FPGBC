@@ -158,10 +158,34 @@ class ASMTransformer(Transformer):
 	
 	def jump_rel_cd(self, inst):
 		bytes = [
-			0b_00_100_000 | (inst[1].byte() << 3),
+			0b00_100_000 | (inst[1].byte() << 3),
 			inst[2]
 		]
 		return bytes
+
+	def add_a_r8(self, inst):
+		return 0b10_000_000 | inst[2].byte()
+	
+	def adc_a_r8(self, inst):
+		return 0b10_001_000 | inst[2].byte()
+	
+	def sub_a_r8(self, inst):
+		return 0b10_010_000 | inst[2].byte()
+	
+	def sbc_a_r8(self, inst):
+		return 0b10_011_000 | inst[2].byte()
+	
+	def and_a_r8(self, inst):
+		return 0b10_100_000 | inst[2].byte()
+	
+	def xor_a_r8(self, inst):
+		return 0b10_101_000 | inst[2].byte()
+	
+	def or_a_r8(self, inst):
+		return 0b10_110_000 | inst[2].byte()
+	
+	def cp_a_r8(self, inst):
+		return 0b10_111_000 | inst[2].byte()
 
 	def line_list(self, _):
 		for label, addr in self.labels.items():

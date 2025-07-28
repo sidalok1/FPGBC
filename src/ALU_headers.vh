@@ -1,19 +1,25 @@
 `ifndef ALU_H
 `define ALU_H
 
-`define ALU_opwidth 3
+`define ALU_opwidth 4
 
-`define PAS 0
-`define ADD 'b0001
-`define ADC 'b0010
-`define SUB 'b0011
-`define RLC 'b0100
-`define RRC 'b0101
-`define RL  'b0110
-`define RR  'b0111
-`define DAA 'b1000
-`define CPL 'b1001
-`define SCF 'b1010
-`define CCF 'b1011
+`define ADD 'b00000
+`define ADC 'b00001
+`define SUB 'b00010
+`define SBC 'b00011
+`define AND 'b00100
+`define XOR 'b00101
+`define OR  'b00110
+`define DAA 'b00111
+
+`define RLC 'b01000
+`define RRC 'b01001
+`define RL  'b01010
+`define RR  'b01011
+
+`define CPL 'b01100
+`define SCF 'b01101
+`define CCF 'b01110
+`define PAS 'b01111
 
 `endif

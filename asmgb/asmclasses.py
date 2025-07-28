@@ -5,7 +5,7 @@ class r8(StrEnum):
 	B = "B"
 	C = "C"
 	D = "D"
-	E = "D"
+	E = "E"
 	H = "H"
 	L = "L"
 	HL = "HLR8"

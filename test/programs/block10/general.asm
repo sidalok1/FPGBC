@@ -52,8 +52,6 @@ start:
 	jr nz, fail
 	stop
 
-
-
 fail:
 	ld a, 0x00
 	stop
