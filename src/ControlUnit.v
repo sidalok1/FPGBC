@@ -70,6 +70,9 @@ module ControlUnit(
     assign MSBm[3] = `h;
     assign LSBm[3] = `l;
 
+    wire halt;
+    assign halt = IR[5:0] == 6'b110_110;
+
     always @ ( posedge clk ) begin
         state <= next;
     end
@@ -481,6 +484,50 @@ module ControlUnit(
                 addrl = `z;
                 rd_idu = `pc;
                 fetch = 1;
+            end
+            endcase
+        end
+        'b01_xxx_xxx: begin
+            case ( state )
+            `s0: begin
+                if ( halt ) begin
+                    next = `s1;
+                    idu_op = `DEC;
+                    rd_idu = `pc;
+                end
+                else if ( IR[5:3] == 'b110 ) begin
+                    next = `s2;
+                    addrh = `h;
+                    addrl = `l;
+                    r1 = IR[2:0];
+                    writeback = 1;
+                end 
+                else if ( IR[2:0] == 'b110 ) begin
+                    next = `s2;
+                    addrh = `h;
+                    addrl = `l;
+                    data_sel = `din;
+                    rd = IR[5:3];
+                end
+                else begin
+                    fetch = 1;
+                    rd_idu = `pc;
+                    r1 = IR[2:0];
+                    rd = IR[5:3];
+                    data_sel = `alu;
+                end
+            end
+            `s1: begin
+                fetch = 1;
+                next = `s1;
+                if ( wake ) begin
+                    next = `s0;
+                    rd_idu = `pc;
+                end
+            end
+            `s2: begin
+                fetch = 1;
+                rd_idu = `pc;
             end
             endcase
         end

@@ -120,6 +120,7 @@ impl RunState {
 	fn decode_xxxxxxxx(&mut self, inst: u8) -> Instruction {
 		match getbits(inst, 7, 6) {
 			0b00 => self.decode_00_xxxxxx(inst),
+			0b01 => self.decode_01_xxxxxx(inst),
 			_ => unimp!(inst)
 		}
 	}
@@ -219,11 +220,11 @@ impl RunState {
 	fn decode_00_xxx_011(&mut self, inst: u8) -> Instruction {
 		match getbits(inst, 3, 3) {
 			0b0 => Instruction { 
-				mnemonic: format!("inc {}", R16::r16mem(getbits(inst, 5, 4))), 
+				mnemonic: format!("inc {}", R16::r16(getbits(inst, 5, 4))), 
 				itype: Arith16bit
 			},
 			0b1 => Instruction { 
-				mnemonic: format!("dec {}", R16::r16mem(getbits(inst, 5, 4))), 
+				mnemonic: format!("dec {}", R16::r16(getbits(inst, 5, 4))), 
 				itype: Arith16bit
 			},
 			_ => invalid!(inst)
@@ -244,6 +245,27 @@ impl RunState {
 				_ => panic!("getbits returned more than 3 bit uint!")
 			}), 
 			itype: Arith8bit 
+		}
+	}
+
+	fn decode_01_xxxxxx(&mut self, inst: u8) -> Instruction {
+		if getbits(inst, 5, 3) == 0b110 && getbits(inst, 2, 0) == 0b110 {
+			Instruction {
+				mnemonic: String::from("halt"),
+				itype: Misc
+			}
+		} else {
+			self.decode_01_xxx_xxx(inst)
+		}
+	}
+
+	fn decode_01_xxx_xxx(&mut self, inst: u8) -> Instruction {
+		Instruction { 
+			mnemonic: format!("ld {}, {}",
+					R8::r8(getbits(inst, 5, 3)),
+					R8::r8(getbits(inst, 2, 0))
+				), 
+			itype: Load8bit
 		}
 	}
 

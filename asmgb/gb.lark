@@ -13,6 +13,7 @@ instruction		:	_mnemonic SH_COMMENT?
 _mnemonic		:	increment
 				|	decrement
 				|	jump_rel
+				|	load_r8_r8
 				|	load_imm16
 				|	load_imm8
 				|	load_r16_a
@@ -30,11 +31,13 @@ _mnemonic		:	increment
 				|	SCF
 				|	CCF
 				|	STOP
+				|	HALT
 
 increment		:	INC (r16 | r8)
 decrement		:	DEC (r16 | r8)
 jump_rel		:	JR (_imm | CNAME)
 
+load_r8_r8		:	LD r8 ","? r8
 load_imm16		:	LD r16 ","? _imm
 load_imm8		:	LD r8 ","? _imm
 load_r16_a		:	LD "[" r16mem "]" ","? A
@@ -45,6 +48,7 @@ jump_rel_cd		:	JR COND ","? (_imm | CNAME)
 
 NOP				:	"nop"
 STOP			:	"stop"
+HALT			:	"halt"
 RLCA			:	"rlca"
 RRCA			:	"rrca"
 RLA				:	"rla"
@@ -85,11 +89,11 @@ COND			:	"z"i
 				| 	"c"i
 				| 	"nc"i
 
-_imm				:	DECNUM | _hex | _bin
+_imm			:	DECNUM | _hex | _bin
 DECNUM			:	INT | SIGNED_INT
-_hex				:	"0x" HEXNUM
+_hex			:	"0x" HEXNUM
 HEXNUM			:	HEXDIGIT+
-_bin				:	"0b" BINNUM
+_bin			:	"0b" BINNUM
 BINNUM			:	("0" | "1")+
 
 

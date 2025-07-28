@@ -60,6 +60,9 @@ class ASMTransformer(Transformer):
 	def STOP(self, _):
 		return 0b00010000
 	
+	def HALT(self, _):
+		return 0b01_110_110
+	
 	def RLCA(self, _):
 		return 0b00_000_111
 	
@@ -123,6 +126,9 @@ class ASMTransformer(Transformer):
 		else:
 			inst[1] = inst[1]
 		return [0b00_011_000, inst[1]]
+	
+	def load_r8_r8(self, inst):
+		return 0b01_000_000 | (inst[1].byte() << 3) | inst[2].byte()
 	
 	def load_imm16(self, inst):
 		bytes = list()

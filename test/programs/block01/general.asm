@@ -20,3 +20,6 @@ pass:
 	ld [hl], [hl] 		# should halt
 	ld a, 0
 	stop
+
+
+
