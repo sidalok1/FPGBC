@@ -119,7 +119,7 @@ HEXNUM			:	HEXDIGIT+
 _bin			:	"0b" BINNUM
 BINNUM			:	("0" | "1")+
 
-
+ASM_COMMENT: /;[^\n]*/
 
 %import common.DIGIT
 %import common.HEXDIGIT
@@ -130,4 +130,5 @@ BINNUM			:	("0" | "1")+
 %import common.NEWLINE
 %import common.CNAME
 %ignore SH_COMMENT
+%ignore ASM_COMMENT
 %ignore WS

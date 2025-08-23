@@ -1,4 +1,4 @@
-`include "RegFile_headers.vh"
+
 
 module RegisterFile ( 
     clk, 
@@ -6,6 +6,8 @@ module RegisterFile (
     r1, r2, ctr, alu1, alu2,
     addr, addrh, addrl, idu, rd_idu
     );
+
+    `include "RegFile_params.vh"
 
     input wire          clk;
 
@@ -38,38 +40,38 @@ module RegisterFile (
             r8[i] = 0;
         end
         
-        r8[`one] = 8'b1;
+        r8[ONE] = 8'b1;
     end
 
     assign flags_out = flags;
 
     always @ ( posedge clk ) begin
         case ( rd )
-        `b, `c, `d, `e, `h, 
-        `l, `a, `pch, `pcl, 
-        `sph, `spl, `w, `z: r8[rd] <= din;
-        `ctr, `one, `f:; // garbage writes
+        B, C, D, E, H, 
+        L, A, PCH, PCL, 
+        SPH, SPL, W, Z: r8[rd] <= din;
+        CTR, ONE, F:; // garbage writes
         endcase
 
         if ( mask[4] ) begin
-            r8[`f][7:4] <= (flags_in & mask[3:0]) | (r8[`f][7:4] & ~mask[3:0]);
-            flags <= (flags_in & mask[3:0]) | (r8[`f][7:4] & ~mask[3:0]);
+            r8[F][7:4] <= (flags_in & mask[3:0]) | (r8[F][7:4] & ~mask[3:0]);
+            flags <= (flags_in & mask[3:0]) | (r8[F][7:4] & ~mask[3:0]);
         end
 
         case ( rd_idu )
-        `bc: {r8[`b], r8[`c]} <= idu;
-        `de: {r8[`d], r8[`e]} <= idu;
-        `hl: {r8[`h], r8[`l]} <= idu;
-        `sp: {r8[`sph], r8[`spl]} <= idu;
-        `pc: {r8[`pch], r8[`pcl]} <= idu;
-        `wz: {r8[`w], r8[`z]} <= idu;
-        `_w: r8[`w] <= idu[7:0];
-        `ff:; // garbage writes
+        BC: {r8[B], r8[C]} <= idu;
+        DE: {r8[D], r8[E]} <= idu;
+        HL: {r8[H], r8[L]} <= idu;
+        SP: {r8[SPH], r8[SPL]} <= idu;
+        PC: {r8[PCH], r8[PCL]} <= idu;
+        WZ: {r8[W], r8[Z]} <= idu;
+        _W: r8[W] <= idu[7:0];
+        FF:; // garbage writes
         endcase
     end
 
     always @( ctr ) begin
-        r8[`ctr] = ctr;
+        r8[CTR] = ctr;
     end
 
 endmodule

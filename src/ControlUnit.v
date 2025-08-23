@@ -1,7 +1,3 @@
-`include "Control_headers.vh"
-`include "ALU_headers.vh"
-`include "IDU_headers.vh"
-`include "RegFile_headers.vh"
 
 module ControlUnit(
         clk, wake,
@@ -17,58 +13,65 @@ module ControlUnit(
         alu_op, flag_mask, idu_op,
         cc, cc_true,
         intr_req
-    );
+);
+    
+    `include "RegFile_params.vh"
+    `include "Control_params.vh"
+    `include "IDU_params.vh"
+    `include "ALU_params.vh"
+
     input wire          clk, wake;
     input wire          intr_req;
     input wire  [7:0]   IR;
     output reg          writeback = 0;
-    output reg          data_sel = `din;
-    output reg  [3:0]   r1 = `ctr, r2 = `ctr, rd = `ctr, addrh = `pch, addrl = `pcl;
+    output reg          data_sel = DIN;
+    output reg  [3:0]   r1 = CTR, r2 = CTR, rd = CTR, addrh = PCH, addrl = PCL;
     output reg  [7:0]   ctr;
-    output reg  [2:0]   rd_idu = `ff;
-    output reg  [`ALU_opwidth:0]   alu_op;
-    output reg  [`IDU_opwidth:0]   idu_op;
+    output reg  [2:0]   rd_idu = FF;
+    output reg  [ALU_OPWIDTH:0]   alu_op;
+    output reg  [IDU_OPWIDTH:0]   idu_op;
     output reg  [4:0]   flag_mask;
     output reg          fetch = 0;
     output reg  [1:0]   cc;
     input wire          cc_true;
+
     
-    reg [5:0] state = `s0, next = `s0;
+    reg [5:0] state = S0, next = S0;
     reg prefix = 0;
 
     reg [7:0] IE = 0;
     reg IME;
 
-    wire [`IDU_opwidth:0] r16mem_op [0:3];
-    assign r16mem_op[0] = `ZER; // [bc]
-    assign r16mem_op[1] = `ZER; // [de]
-    assign r16mem_op[2] = `INC; // [hl+]
-    assign r16mem_op[3] = `DEC; // [hl-]
+    wire [IDU_OPWIDTH:0] r16mem_op [0:3];
+    assign r16mem_op[0] = ZER; // [bc]
+    assign r16mem_op[1] = ZER; // [de]
+    assign r16mem_op[2] = INC; // [hl+]
+    assign r16mem_op[3] = DEC; // [hl-]
     wire [2:0] r16mem_rd [0:3];
-    assign r16mem_rd[0] = `bc; // [bc]
-    assign r16mem_rd[1] = `de; // [de]
-    assign r16mem_rd[2] = `hl; // [hl+]
-    assign r16mem_rd[3] = `hl; // [hl-]
+    assign r16mem_rd[0] = BC; // [bc]
+    assign r16mem_rd[1] = DE; // [de]
+    assign r16mem_rd[2] = HL; // [hl+]
+    assign r16mem_rd[3] = HL; // [hl-]
 
     wire [7:0] MSB [0:3], LSB [0:3];
-    assign MSB[`bc] = `b;
-    assign LSB[`bc] = `c;
-    assign MSB[`de] = `d;
-    assign LSB[`de] = `e;
-    assign MSB[`hl] = `h;
-    assign LSB[`hl] = `l;
-    assign MSB[`sp] = `sph;
-    assign LSB[`sp] = `spl;
+    assign MSB[BC] = B;
+    assign LSB[BC] = C;
+    assign MSB[DE] = D;
+    assign LSB[DE] = E;
+    assign MSB[HL] = H;
+    assign LSB[HL] = L;
+    assign MSB[SP] = SPH;
+    assign LSB[SP] = SPL;
 
     wire [7:0] MSBm [0:3], LSBm [0:3];
-    assign MSBm[0] = `b;
-    assign LSBm[0] = `c;
-    assign MSBm[1] = `d;
-    assign LSBm[1] = `e;
-    assign MSBm[2] = `h;
-    assign LSBm[2] = `l;
-    assign MSBm[3] = `h;
-    assign LSBm[3] = `l;
+    assign MSBm[0] = B;
+    assign LSBm[0] = C;
+    assign MSBm[1] = D;
+    assign LSBm[1] = E;
+    assign MSBm[2] = H;
+    assign LSBm[2] = L;
+    assign MSBm[3] = H;
+    assign LSBm[3] = L;
 
     wire halt;
     assign halt = IR[5:0] == 6'b110_110;
@@ -78,46 +81,46 @@ module ControlUnit(
     end
 
     always @* begin
-        next = `s0;
+        next = S0;
         fetch = 0;
         writeback = 0;
-        r1 = `ctr;
-        r2 = `ctr;
+        r1 = CTR;
+        r2 = CTR;
         ctr = 0;
-        rd = `ctr; // ignore writes to ctr
-        addrh = `pch;
-        addrl = `pcl;
-        rd_idu = `ff; // ignore writes to ff
-        alu_op = `PAS;
-        idu_op = `INC;
+        rd = CTR; // ignore writes to ctr
+        addrh = PCH;
+        addrl = PCL;
+        rd_idu = FF; // ignore writes to ff
+        alu_op = PAS;
+        idu_op = INC;
         cc = 0;
         flag_mask = 0;
-        data_sel = `din;
+        data_sel = DIN;
         // begin state logic
 
         casex ( IR )
         'b00_000_000: begin
             $display("nop");
             // nop
-            rd_idu = `pc;
+            rd_idu = PC;
             fetch = 1;
         end
         'b00_xx0_001: begin
             // ld r16, imm16
             `executing("ld r16, imm16")
             case ( state )
-            `s0: begin
-                next = `s1;
-                rd_idu = `pc;
+            S0: begin
+                next = S1;
+                rd_idu = PC;
                 rd = LSB[IR[5:4]];
             end
-            `s1: begin
-                next = `s2;
-                rd_idu = `pc;
+            S1: begin
+                next = S2;
+                rd_idu = PC;
                 rd = MSB[IR[5:4]];
             end
-            `s2: begin
-                rd_idu = `pc;
+            S2: begin
+                rd_idu = PC;
                 fetch = 1;
             end
             endcase
@@ -125,18 +128,18 @@ module ControlUnit(
         'b00_xx0_010: begin
             `executing("ld [r16mem], a")
             case ( state )
-            `s0: begin
-                next = `s1;
+            S0: begin
+                next = S1;
                 addrh = MSBm[IR[5:4]];
                 addrl = LSBm[IR[5:4]];
-                r1 = `a;
-                alu_op = `PAS;
+                r1 = A;
+                alu_op = PAS;
                 idu_op = r16mem_op[IR[5:4]];
                 rd_idu = r16mem_rd[IR[5:4]];
                 writeback = 1;
             end
-            `s1: begin
-                rd_idu = `pc;
+            S1: begin
+                rd_idu = PC;
                 fetch = 1;
             end
             endcase
@@ -144,14 +147,14 @@ module ControlUnit(
         'b00_xx0_011: begin
             $display("inc r16");
             case ( state )
-            `s0: begin
-                next = `s1;
+            S0: begin
+                next = S1;
                 addrh = MSB[IR[5:4]];
                 addrl = LSB[IR[5:4]];
                 rd_idu = IR[5:4];
             end
-            `s1: begin
-                rd_idu = `pc;
+            S1: begin
+                rd_idu = PC;
                 fetch = 1;
             end
             endcase
@@ -159,35 +162,35 @@ module ControlUnit(
         'b00_xxx_100: begin
             $display("inc r8");
             case ( state )
-            `s0: begin
+            S0: begin
                 if ( IR[5:3] == 'b110 ) begin
-                    next = `s1;
-                    addrh = `h;
-                    addrl = `l;
-                    rd = `z;
+                    next = S1;
+                    addrh = H;
+                    addrl = L;
+                    rd = Z;
                 end else begin
-                    next = `s2;
+                    next = S2;
                     rd = IR[5:3];
                     r1 = IR[5:3];
-                    r2 = `one;
-                    alu_op = `ADD;
-                    data_sel = `alu;
-                    flag_mask = `fz | `fn | `fh ;
+                    r2 = ONE;
+                    alu_op = ADD;
+                    data_sel = ALU;
+                    flag_mask = ZFLAG | NFLAG | HFLAG ;
                 end
             end
-            `s1: begin
-                next = `s2;
-                addrh = `h;
-                addrl = `l;
-                alu_op = `ADD;
-                data_sel = `alu;
-                r1 = `z;
-                r2 = `one;
-                flag_mask = `fz | `fn | `fh ;
+            S1: begin
+                next = S2;
+                addrh = H;
+                addrl = L;
+                alu_op = ADD;
+                data_sel = ALU;
+                r1 = Z;
+                r2 = ONE;
+                flag_mask = ZFLAG | NFLAG | HFLAG ;
                 writeback = 1;
             end
-            `s2: begin
-                rd_idu = `pc;
+            S2: begin
+                rd_idu = PC;
                 fetch = 1;
             end
             endcase
@@ -195,35 +198,35 @@ module ControlUnit(
         'b00_xxx_101: begin
             $display("dec r8");
             case ( state )
-            `s0: begin
+            S0: begin
                 if ( IR[5:3] == 'b110 ) begin
-                    next = `s1;
-                    addrh = `h;
-                    addrl = `l;
-                    rd = `z;
+                    next = S1;
+                    addrh = H;
+                    addrl = L;
+                    rd = Z;
                 end else begin
-                    next = `s2;
+                    next = S2;
                     rd = IR[5:3];
                     r1 = IR[5:3];
-                    r2 = `one;
-                    alu_op = `SUB;
-                    data_sel = `alu;
-                    flag_mask = `fz | `fn | `fh ;
+                    r2 = ONE;
+                    alu_op = SUB;
+                    data_sel = ALU;
+                    flag_mask = ZFLAG | NFLAG | HFLAG ;
                 end
             end
-            `s1: begin
-                next = `s2;
-                addrh = `h;
-                addrl = `l;
-                alu_op = `SUB;
-                data_sel = `alu;
-                r1 = `z;
-                r2 = `one;
-                flag_mask = `fz | `fn | `fh ;
+            S1: begin
+                next = S2;
+                addrh = H;
+                addrl = L;
+                alu_op = SUB;
+                data_sel = ALU;
+                r1 = Z;
+                r2 = ONE;
+                flag_mask = ZFLAG | NFLAG | HFLAG ;
                 writeback = 1;
             end
-            `s2: begin
-                rd_idu = `pc;
+            S2: begin
+                rd_idu = PC;
                 fetch = 1;
             end
             endcase
@@ -231,119 +234,119 @@ module ControlUnit(
         'b00_xxx_110: begin
             $display("ld r8, imm8");
             case ( state )
-            `s0: begin
-                rd_idu = `pc;
+            S0: begin
+                rd_idu = PC;
                 if ( IR[5:3] == 'b110 ) begin
-                    next = `s1;
-                    rd = `z;
+                    next = S1;
+                    rd = Z;
                 end else begin
-                    next = `s2;
+                    next = S2;
                     rd = IR[5:3];
                 end
             end
-            `s1: begin
-                next = `s2;
-                r1 = `z;
-                addrh = `h;
-                addrl = `l;
+            S1: begin
+                next = S2;
+                r1 = Z;
+                addrh = H;
+                addrl = L;
                 writeback = 1;
             end
-            `s2: begin
-                rd_idu = `pc;
+            S2: begin
+                rd_idu = PC;
                 fetch = 1;
             end
             endcase
         end
         'b00_xxx_111: begin
-            r1 = `a;
-            r2 = `ctr;
-            data_sel = `alu;
-            ctr = `a;
-            rd_idu = `pc;
+            r1 = A;
+            r2 = CTR;
+            data_sel = ALU;
+            ctr = A;
+            rd_idu = PC;
             fetch = 1;
             casex ( IR[5:3] )
             'b0xx: begin
-                rd = `a;
+                rd = A;
                 alu_op = {2'b01, IR[5:3]};
-                flag_mask = `fAll;
+                flag_mask = ALLFLAG;
             end
             'b100: begin
-                rd = `a;
-                alu_op = `DAA;
-                flag_mask = `fz | `fh | `fc ;
+                rd = A;
+                alu_op = DAA;
+                flag_mask = ZFLAG | HFLAG | CFLAG ;
             end
             'b101: begin
-                rd = `a;
-                alu_op = `CPL;
-                flag_mask = `fn | `fh ;
+                rd = A;
+                alu_op = CPL;
+                flag_mask = NFLAG | HFLAG ;
             end
             'b110: begin
-                alu_op = `SCF;
-                flag_mask = `fz | `fh | `fc ;
+                alu_op = SCF;
+                flag_mask = ZFLAG | HFLAG | CFLAG ;
             end
             'b111: begin
-                alu_op = `CCF;
-                flag_mask = `fz | `fh | `fc ;
+                alu_op = CCF;
+                flag_mask = ZFLAG | HFLAG | CFLAG ;
             end
             endcase
         end
         'b00_001_000: begin
             `executing("ld [imm16], sp")
             case ( state )
-            `s0: begin
-                next = `s1;
-                rd = `z;
-                data_sel = `din;
-                rd_idu = `pc;
+            S0: begin
+                next = S1;
+                rd = Z;
+                data_sel = DIN;
+                rd_idu = PC;
             end
-            `s1: begin
-                next = `s2;
-                rd = `w;
-                data_sel = `din;
-                rd_idu = `pc;
+            S1: begin
+                next = S2;
+                rd = W;
+                data_sel = DIN;
+                rd_idu = PC;
             end
-            `s2: begin
-                next = `s3;
-                addrh = `w;
-                addrl = `z;
-                r1 = `spl;
+            S2: begin
+                next = S3;
+                addrh = W;
+                addrl = Z;
+                r1 = SPL;
                 writeback = 1;
-                rd_idu = `wz;
+                rd_idu = WZ;
             end
-            `s3: begin
-                next = `s4;
-                addrh = `w;
-                addrl = `z;
-                r1 = `sph;
+            S3: begin
+                next = S4;
+                addrh = W;
+                addrl = Z;
+                r1 = SPH;
                 writeback = 1;
             end
-            `s4: begin
-                rd_idu = `pc;
+            S4: begin
+                rd_idu = PC;
                 fetch = 1;
             end
             endcase
         end
         'b00_xx1_001: begin
             `executing("add hl, r16")
-            data_sel = `alu;
-            flag_mask = `fn | `fh | `fc ;
+            data_sel = ALU;
+            flag_mask = NFLAG | HFLAG | CFLAG ;
             case ( state )
-            `s0: begin
-                next = `s1;
-                alu_op = `ADD;
-                r1 = `l;
+            S0: begin
+                next = S1;
+                alu_op = ADD;
+                r1 = L;
                 r2 = LSB[IR[5:4]];
-                rd = `l;
+                rd = L;
             end
-            `s1: begin
-                alu_op = `ADC;
-                r1 = `h;
+            S1: begin
+                alu_op = ADC;
+                r1 = H;
                 r2 = MSB[IR[5:4]];
-                rd = `h;
+                rd = H;
 
-                addrh = `pch;
-                addrl = `pcl;
-                rd_idu = `pc;
+                addrh = PCH;
+                addrl = PCL;
+                rd_idu = PC;
                 fetch = 1;
             end
             endcase
@@ -351,17 +354,17 @@ module ControlUnit(
         'b00_xx1_010: begin
             $display("ld a, [r16mem]");
             case ( state )
-            `s0: begin
-                next = `s1;
+            S0: begin
+                next = S1;
                 addrh = MSBm[IR[5:4]];
                 addrl = LSBm[IR[5:4]];
-                data_sel = `din;
+                data_sel = DIN;
                 idu_op = r16mem_op[IR[5:4]];
                 rd_idu = r16mem_rd[IR[5:4]];
-                rd = `a;
+                rd = A;
             end
-            `s1: begin
-                rd_idu = `pc;
+            S1: begin
+                rd_idu = PC;
                 fetch = 1;
             end
             endcase
@@ -369,15 +372,15 @@ module ControlUnit(
         'b00_xx1_011: begin
             $display("dec r16");
             case ( state )
-            `s0: begin
-                next = `s1;
+            S0: begin
+                next = S1;
                 addrh = MSB[IR[5:4]];
                 addrl = LSB[IR[5:4]];
                 rd_idu = IR[5:4];
-                idu_op = `DEC;
+                idu_op = DEC;
             end
-            `s1: begin
-                rd_idu = `pc;
+            S1: begin
+                rd_idu = PC;
                 fetch = 1;
             end
             endcase
@@ -386,42 +389,42 @@ module ControlUnit(
             `executing("stop")
             // temporary (possibly incorrect) implementation of stop
             case ( state )
-                `s0: begin
+                S0: begin
                     if ( wake ) begin
-                        rd_idu = `pc;
+                        rd_idu = PC;
                         fetch = 1;
                     end else begin
-                        next = `s1;
+                        next = S1;
                     end
                 end
-                `s1: $finish();
+                S1: $finish();
             endcase
         end
         'b00_011_000: begin
             `executing("jr imm8")
             case ( state )
-            `s0: begin
-                next = `s1;
-                data_sel = `din;
-                rd = `z;
-                rd_idu = `pc;
+            S0: begin
+                next = S1;
+                data_sel = DIN;
+                rd = Z;
+                rd_idu = PC;
             end
-            `s1: begin
-                next = `s2;
-                data_sel = `alu;
-                alu_op = `ADD;
-                r1 = `pcl;
-                r2 = `z;
-                rd = `z;
-                idu_op = `ADJ;
-                addrl = `pch;
-                addrh = `ctr;
+            S1: begin
+                next = S2;
+                data_sel = ALU;
+                alu_op = ADD;
+                r1 = PCL;
+                r2 = Z;
+                rd = Z;
+                idu_op = ADJ;
+                addrl = PCH;
+                addrh = CTR;
                 ctr = 8'b0;
             end
-            `s2: begin
-                addrh = `w;
-                addrl = `z;
-                rd_idu = `pc;
+            S2: begin
+                addrh = W;
+                addrl = Z;
+                rd_idu = PC;
                 fetch = 1;
             end
             endcase
@@ -429,121 +432,121 @@ module ControlUnit(
         'b00_1xx_000: begin
             `executing("jr cond, imm8")
             case ( state )
-            `s0: begin
-                data_sel = `din;
-                rd = `z;
-                rd_idu = `pc;
+            S0: begin
+                data_sel = DIN;
+                rd = Z;
+                rd_idu = PC;
                 cc = IR[4:3];
                 if ( cc_true ) begin
-                    next = `s2;
+                    next = S2;
                 end else begin
-                    next = `s1;
+                    next = S1;
                 end
             end
-            `s1: begin
-                rd_idu = `pc;
+            S1: begin
+                rd_idu = PC;
                 fetch = 1;
             end
-            `s2: begin
-                next = `s3;
-                data_sel = `alu;
-                alu_op = `ADD;
-                r1 = `pcl;
-                r2 = `z;
-                rd = `z;
-                idu_op = `ADJ;
-                addrl = `pch;
-                addrh = `ctr;
+            S2: begin
+                next = S3;
+                data_sel = ALU;
+                alu_op = ADD;
+                r1 = PCL;
+                r2 = Z;
+                rd = Z;
+                idu_op = ADJ;
+                addrl = PCH;
+                addrh = CTR;
                 ctr = 8'b0;
             end
-            `s3: begin
-                addrh = `w;
-                addrl = `z;
-                rd_idu = `pc;
+            S3: begin
+                addrh = W;
+                addrl = Z;
+                rd_idu = PC;
                 fetch = 1;
             end
             endcase
         end
         'b01_xxx_xxx: begin
             case ( state )
-            `s0: begin
+            S0: begin
                 if ( halt ) begin
-                    next = `s1;
-                    idu_op = `DEC;
-                    rd_idu = `pc;
+                    next = S1;
+                    idu_op = DEC;
+                    rd_idu = PC;
                 end
                 else if ( IR[5:3] == 'b110 ) begin
-                    next = `s2;
-                    addrh = `h;
-                    addrl = `l;
+                    next = S2;
+                    addrh = H;
+                    addrl = L;
                     r1 = IR[2:0];
                     writeback = 1;
                 end 
                 else if ( IR[2:0] == 'b110 ) begin
-                    next = `s2;
-                    addrh = `h;
-                    addrl = `l;
-                    data_sel = `din;
+                    next = S2;
+                    addrh = H;
+                    addrl = L;
+                    data_sel = DIN;
                     rd = IR[5:3];
                 end
                 else begin
                     fetch = 1;
-                    rd_idu = `pc;
+                    rd_idu = PC;
                     r1 = IR[2:0];
                     rd = IR[5:3];
-                    data_sel = `alu;
+                    data_sel = ALU;
                 end
             end
-            `s1: begin
+            S1: begin
                 fetch = 1;
-                next = `s1;
+                next = S1;
                 if ( wake ) begin
-                    next = `s0;
-                    rd_idu = `pc;
+                    next = S0;
+                    rd_idu = PC;
                 end
             end
-            `s2: begin
+            S2: begin
                 fetch = 1;
-                rd_idu = `pc;
+                rd_idu = PC;
             end
             endcase
         end
         'b10_xxx_xxx: begin
             case ( state )
-            `s0: begin
+            S0: begin
                 if ( IR[2:0] == 'b110 ) begin
-                    next = `s1;
-                    rd = `z;
-                    addrh = `h;
-                    addrl = `l;
-                    data_sel = `din;
+                    next = S1;
+                    rd = Z;
+                    addrh = H;
+                    addrl = L;
+                    data_sel = DIN;
                 end else begin
-                    r1 = `a;
+                    r1 = A;
                     r2 = IR[2:0];
-                    data_sel = `alu;
+                    data_sel = ALU; 
                     if ( IR[5:3] == 'b111 ) begin
-                        alu_op = `SUB;
+                        alu_op = SUB;
                     end else begin
                         alu_op = {2'b00, IR[5:3]};
-                        rd = `a; 
+                        rd = A; 
                     end
-                    flag_mask = `fAll;
-                    rd_idu = `pc;
+                    flag_mask = ALLFLAG;
+                    rd_idu = PC;
                     fetch = 1;
                 end
             end
-            `s1: begin
-                r1 = `a;
-                r2 = `z;
-                data_sel = `alu;
+            S1: begin
+                r1 = A;
+                r2 = Z;
+                data_sel = ALU;
                 if ( IR[5:3] == 'b111 ) begin
-                    alu_op = `SUB;
+                    alu_op = SUB;
                 end else begin
                     alu_op = {2'b00, IR[5:3]};
-                    rd = `a; 
+                    rd = A; 
                 end
-                flag_mask = `fAll;
-                rd_idu = `pc;
+                flag_mask = ALLFLAG;
+                rd_idu = PC;
                 fetch = 1;
             end
             endcase
