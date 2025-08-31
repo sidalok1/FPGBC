@@ -1,8 +1,11 @@
-`include "ALU_headers.vh"
-`include "RegFile_headers.vh"
 
 module ALU ( op, in1, in2, out, flags_in, flags_out );
-    input [`ALU_opwidth:0] op;
+
+    `include "ALU_params.vh"
+    `include "RegFile_params.vh"
+
+
+    input [ALU_OPWIDTH:0] op;
     input [7:0] in1, in2;
     input [3:0] flags_in;
     output wire [7:0] out;
@@ -38,8 +41,8 @@ module ALU ( op, in1, in2, out, flags_in, flags_out );
 
     always @( op, in1, in2, carry, offset ) begin
         case (op) 
-        `PAS: full_result[7:0] = in1;
-        `ADD: begin
+        PAS: full_result[7:0] = in1;
+        ADD: begin
             full_result = in1 + in2;
             half_result = in1[3:0] + in2[3:0];
             z = full_result[7:0] == 0;
@@ -47,7 +50,7 @@ module ALU ( op, in1, in2, out, flags_in, flags_out );
             c = full_result[8];
             h = half_result[4];
         end
-        `ADC: begin
+        ADC: begin
             full_result = in1 + in2 + carry;
             half_result = in1[3:0] + in2[3:0] + carry;
             z = full_result[7:0] == 0;
@@ -55,7 +58,7 @@ module ALU ( op, in1, in2, out, flags_in, flags_out );
             c = full_result[8];
             h = half_result[4];
         end
-        `SUB: begin
+        SUB: begin
             full_result = in1 - in2;
             half_result = in1[3:0] - in2[3:0];
             z = full_result[7:0] == 0;
@@ -63,7 +66,7 @@ module ALU ( op, in1, in2, out, flags_in, flags_out );
             c = full_result[8];
             h = half_result[4];
         end
-        `SBC: begin
+        SBC: begin
             full_result = in1 - in2 - carry;
             half_result = in1[3:0] - in2[3:0] - carry;
             z = full_result[7:0] == 0;
@@ -71,71 +74,71 @@ module ALU ( op, in1, in2, out, flags_in, flags_out );
             c = full_result[8];
             h = half_result[4];
         end
-        `AND: begin
+        AND: begin
             full_result = {1'b0, in1 & in2};
             z = full_result == 0;
             n = 0;
             h = 1;
             c = 0;
         end
-        `XOR: begin
+        XOR: begin
             full_result = {1'b0, in1 ^ in2};
             z = full_result == 0;
             n = 0;
             h = 0;
             c = 0;
         end
-        `OR: begin
+        OR: begin
             full_result = {1'b0, in1 | in2};
             z = full_result == 0;
             n = 0;
             h = 1;
             c = 0;
         end
-        `RLC: begin
+        RLC: begin
             full_result = {1'b0, in1[6:0], in1[7]};
-            z = (in2 == `a) ? 0 : full_result[7:0] == 0;
+            z = (in2 == A) ? 0 : full_result[7:0] == 0;
             n = 0;
             h = 0;
             c = in1[7];
         end
-        `RRC: begin
+        RRC: begin
             full_result = {1'b0, in1[0], in1[7:1]};
-            z = (in2 == `a) ? 0 : full_result[7:0] == 0;
+            z = (in2 == A) ? 0 : full_result[7:0] == 0;
             n = 0;
             h = 0;
             c = in1[0];
         end
-        `RL: begin
+        RL: begin
             full_result = {1'b0, in1[6:0], carry};
-            z = (in2 == `a) ? 0 : full_result[7:0] == 0;
+            z = (in2 == A) ? 0 : full_result[7:0] == 0;
             n = 0;
             h = 0;
             c = in1[7];
         end
-        `RR: begin
+        RR: begin
             full_result = {1'b0, carry, in1[7:1]};
-            z = (in2 == `a) ? 0 : full_result[7:0] == 0;
+            z = (in2 == A) ? 0 : full_result[7:0] == 0;
             n = 0;
             h = 0;
             c = in1[0];
         end
-        `CPL: begin
+        CPL: begin
             full_result = {1'b0, ~in1};
             n = 1;
             h = 1;
         end
-        `SCF: begin
+        SCF: begin
             c = 1;
             n = 0;
             h = 0;
         end
-        `CCF: begin
+        CCF: begin
             c = ~carry;
             n = 0;
             h = 0;
         end
-        `DAA: begin
+        DAA: begin
             full_result = (subtract) ? in1 - offset : in1 + offset;
             z = full_result[7:0] == 0;
             h = 0;

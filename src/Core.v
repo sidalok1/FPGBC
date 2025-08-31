@@ -1,9 +1,9 @@
-`include "Control_headers.vh"
-`include "ALU_headers.vh"
-`include "IDU_headers.vh"
-`include "RegFile_headers.vh"
-
 module Core( clk, din, dout, addrbus, write_mem, wake );
+
+    `include "Control_params.vh"
+    `include "ALU_params.vh"
+    `include "IDU_params.vh"
+    `include "RegFile_params.vh"
 
     input clk;
     input wake;
@@ -15,8 +15,8 @@ module Core( clk, din, dout, addrbus, write_mem, wake );
     wire sig_writeback, sig_data_sel;
     wire [3:0] sig_r1, sig_r2, sig_rd, sig_addrh, sig_addrl;
     wire [4:0] sig_flag_mask;
-    wire [`ALU_opwidth:0] sig_alu_op;
-    wire [`IDU_opwidth:0] sig_idu_op;
+    wire [ALU_OPWIDTH:0] sig_alu_op;
+    wire [IDU_OPWIDTH:0] sig_idu_op;
     wire [7:0] ctr_data;
     wire [2:0] sig_rd_idu;
 
@@ -33,7 +33,7 @@ module Core( clk, din, dout, addrbus, write_mem, wake );
 
     assign write_mem = sig_writeback;
 
-    assign reg_din = sig_data_sel == `din ? din : alu_out;
+    assign reg_din = sig_data_sel == DIN ? din : alu_out;
 
     assign dout = alu_out;
 
