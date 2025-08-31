@@ -21,6 +21,7 @@ module IDU(
             (carry & ~sign) ? addr_in + 1 :
             (~carry & sign) ? addr_in - 1 :
                               addr_in;
+        default: out = addr_in;
         endcase
     end
 

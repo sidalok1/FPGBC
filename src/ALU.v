@@ -40,6 +40,10 @@ module ALU ( op, in1, in2, out, flags_in, flags_out );
     assign out = full_result[7:0];
 
     always @( op, in1, in2, carry, offset ) begin
+        z = zero;
+        n = subtract;
+        h = half;
+        c = carry;
         case (op) 
         PAS: full_result[7:0] = in1;
         ADD: begin
@@ -95,33 +99,77 @@ module ALU ( op, in1, in2, out, flags_in, flags_out );
             h = 1;
             c = 0;
         end
-        RLC: begin
-            full_result = {1'b0, in1[6:0], in1[7]};
-            z = (in2 == A) ? 0 : full_result[7:0] == 0;
-            n = 0;
-            h = 0;
-            c = in1[7];
+        SHR: begin
+            case ( in2[2:0] )
+            RLC: begin
+                full_result = {1'b0, in1[6:0], in1[7]};
+                z = (in2[3]) ? 0 : full_result == 0;
+                n = 0;
+                h = 0;
+                c = in1[7];
+            end
+            RRC: begin
+                full_result = {1'b0, in1[0], in1[7:1]};
+                z = (in2[3]) ? 0 : full_result == 0;
+                n = 0;
+                h = 0;
+                c = in1[0];
+            end
+            RL: begin
+                full_result = {1'b0, in1[6:0], carry};
+                z = (in2[3]) ? 0 : full_result == 0;
+                n = 0;
+                h = 0;
+                c = in1[7];
+            end
+            RR: begin
+                full_result = {1'b0, carry, in1[7:1]};
+                z = (in2[3]) ? 0 : full_result == 0;
+                n = 0;
+                h = 0;
+                c = in1[0];
+            end
+            SLA: begin
+                full_result = {in1, 1'b0};
+                z = full_result[7:0] == 0;
+                n = 0;
+                h = 0;
+                c = full_result[8];
+            end
+            SRA: begin
+                full_result = {in1[7], in1[7:1]};
+                z = full_result == 0; // full_result[7:0] == 0 iff in1[7] == 0
+                n = 0;
+                h = 0;
+                c = in1[0];
+            end
+            SWP: begin
+                full_result = {1'b0, in1[3:0], in1[7:4]};
+                z = full_result == 0;
+                n = 0;
+                h = 0;
+                c = 0;
+            end
+            SRL: begin
+                full_result = {1'b0, in1[7:1]};
+                z = full_result == 0;
+                n = 0;
+                h = 0;
+                c = in1[0];
+            end
+            default:; // All cases captured
+            endcase
         end
-        RRC: begin
-            full_result = {1'b0, in1[0], in1[7:1]};
-            z = (in2 == A) ? 0 : full_result[7:0] == 0;
+        BIT: begin
+            z = in1[in2[2:0]];
             n = 0;
-            h = 0;
-            c = in1[0];
+            h = 1;
         end
-        RL: begin
-            full_result = {1'b0, in1[6:0], carry};
-            z = (in2 == A) ? 0 : full_result[7:0] == 0;
-            n = 0;
-            h = 0;
-            c = in1[7];
+        RES: begin
+            full_result = {1'b0, in1 & ~(8'b1 << in2[2:0])};
         end
-        RR: begin
-            full_result = {1'b0, carry, in1[7:1]};
-            z = (in2 == A) ? 0 : full_result[7:0] == 0;
-            n = 0;
-            h = 0;
-            c = in1[0];
+        SET: begin
+            full_result = {1'b0, in1 | (8'b1 << in2[2:0])};
         end
         CPL: begin
             full_result = {1'b0, ~in1};
@@ -144,6 +192,7 @@ module ALU ( op, in1, in2, out, flags_in, flags_out );
             h = 0;
             c = full_result > 'h99 || carry;
         end
+        default:; // All cases captured
         endcase
 
     end

@@ -28,8 +28,6 @@ module RegisterFile (
     
     reg [7:0] r8 [0:15]; 
 
-    reg [3:0] flags = 0;
-
     assign alu1 = r8[r1];
     assign alu2 = r8[r2];
     assign addr = {r8[addrh], r8[addrl]};
@@ -43,7 +41,7 @@ module RegisterFile (
         r8[ONE] = 8'b1;
     end
 
-    assign flags_out = flags;
+    assign flags_out = r8[F][7:4];
 
     always @ ( posedge clk ) begin
         case ( rd )
@@ -51,11 +49,11 @@ module RegisterFile (
         L, A, PCH, PCL, 
         SPH, SPL, W, Z: r8[rd] <= din;
         CTR, ONE, F:; // garbage writes
+        default:; // All cases captured
         endcase
 
         if ( mask[4] ) begin
             r8[F][7:4] <= (flags_in & mask[3:0]) | (r8[F][7:4] & ~mask[3:0]);
-            flags <= (flags_in & mask[3:0]) | (r8[F][7:4] & ~mask[3:0]);
         end
 
         case ( rd_idu )
@@ -67,6 +65,7 @@ module RegisterFile (
         WZ: {r8[W], r8[Z]} <= idu;
         _W: r8[W] <= idu[7:0];
         FF:; // garbage writes
+        default:; // All cases captured
         endcase
     end
 

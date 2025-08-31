@@ -1,6 +1,6 @@
-# General test for block 01
-# I am unsure on halt's true behaviour
-#so I am not considering it fully tested
+; General test for block 01
+; I am unsure on halt's true behaviour
+;so I am not considering it fully tested
 
 start:
 	ld a, -1
@@ -17,7 +17,7 @@ start:
 
 pass:
 	ld a, 0xff
-	ld [hl], [hl] 		# should halt
+	ld [hl], [hl] 		; should halt
 	ld a, 0
 	stop
 

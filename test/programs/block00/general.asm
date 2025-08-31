@@ -1,4 +1,4 @@
-# block 00 test
+; block 00 test
 
 test:
 	ld a, 0

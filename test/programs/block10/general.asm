@@ -1,4 +1,4 @@
-# block 10 general test
+; block 10 general test
 
 start:
 	ld c, 1

@@ -19,6 +19,7 @@ module Core( clk, din, dout, addrbus, write_mem, wake );
     wire [IDU_OPWIDTH:0] sig_idu_op;
     wire [7:0] ctr_data;
     wire [2:0] sig_rd_idu;
+    wire [7:0] sig_rst_IF;
 
     wire [7:0] reg_din;
 
@@ -31,18 +32,32 @@ module Core( clk, din, dout, addrbus, write_mem, wake );
     wire [1:0] cc;
     wire cc_result;
 
+    // Interupt registers. Bits 7-5 are unused
+    //  | 7 6 5 |   4   |   3   |   2   |   1   |   0   |
+    //  | 1 1 1 | Joypad| Serial| Timer |  LCD  | VBlank|
+    reg [7:0] IE = 0, IF = 0;
+    // Joypad register. Write 0 to bit 5 or 4 for buttons or d-pad respectively
+    // Reads from bit 3 to 0 are active low. Will read FFh if both bit 5 and 4 
+    //are high
+    //  |  7  6  |   5   |   4   |   3   |   2   |   1   |   0   |
+    //  |  1  1  |   0   |   1   |/Start |/Select|  /B   |  /A   |
+    //  |  1  1  |   1   |   0   | /Down |  /Up  | /Left | /Right|
+    //  |  1  1  |   1   |   1   |   1   |   1   |   1   |   1   |
+    // Setting both bits 5 and 4 to zero is a logical and of input signals
+    reg [7:0] P1 = 8'hFF;
+
     assign write_mem = sig_writeback;
 
     assign reg_din = sig_data_sel == DIN ? din : alu_out;
 
     assign dout = alu_out;
 
-    reg [7:0] IR = 0;
-    wire fetch;
 
     ControlUnit controller (
-        .clk( clk ), .wake( wake ),
-        .IR( IR ), .fetch( fetch ),
+        .clk( clk ),
+        .IE( IE ), .IF ( IF ),
+        .ack_IF( sig_rst_IF ),
+        .data( din ),
         .data_sel( sig_data_sel ),
         .ctr( ctr_data ),
         .r1( sig_r1 ), .r2( sig_r2 ), .rd( sig_rd ), .rd_idu( sig_rd_idu ),
@@ -84,8 +99,8 @@ module Core( clk, din, dout, addrbus, write_mem, wake );
     );
     
     always @ ( posedge clk ) begin
-        if ( fetch ) begin 
-            IR <= din;
+        if ( sig_rst_IF ) begin
+            IF <= IF & (~sig_rst_IF);
         end
     end
 
