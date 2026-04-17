@@ -1,43 +1,42 @@
 [*]
 [*] GTKWave Analyzer v3.3.116 (w)1999-2023 BSI
-[*] Tue Aug 26 17:33:05 2025
+[*] Thu Apr 16 22:41:37 2026
 [*]
-[dumpfile] "/home/sid/code/SM83/_out/waveform.fst"
-[dumpfile_mtime] "Tue Aug 26 17:31:17 2025"
-[dumpfile_size] 6985
-[savefile] "/home/sid/code/SM83/config/tb.sav"
-[timestart] 202800
+[dumpfile] "/home/sid/code/FPGbA/_out/waveform.fst"
+[dumpfile_mtime] "Thu Apr 16 22:39:46 2026"
+[dumpfile_size] 7152
+[savefile] "/home/sid/code/FPGbA/config/tb.sav"
+[timestart] 0
 [size] 1440 960
 [pos] 307401 295007
-*-17.284845 3090 610000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-16.384848 0 610000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] tb_core.
 [treeopen] tb_core.UUT.
-[sst_width] 276
-[signals_width] 186
+[sst_width] 297
+[signals_width] 243
 [sst_expanded] 1
 [sst_vpaned_height] 284
 @28
 tb_core.clk
 @800200
 -Core
-@4023
-^>1 /home/sid/code/SM83/gbfilt/target/release/gbfilt
+@4022
+^>1 /home/sid/code/FPGbA/gbfilt/target/release/gbfilt
 +{Instruction} tb_core.UUT.controller.IR[7:0]
 @22
++{Data Bus} tb_core.UUT.databus[7:0]
 +{Address Bus} tb_core.UUT.addrbus[15:0]
-+{Data in} tb_core.UUT.din[7:0]
-+{Data out} tb_core.UUT.dout[7:0]
 @28
 tb_core.UUT.controller.fetch
-tb_core.UUT.write_mem
+tb_core.UUT.controller.read
 @1000200
 -Core
 @2022
-^2 /home/sid/code/SM83/config/reg8.filt
+^1 /home/sid/code/FPGbA/config/reg8.filt
 tb_core.UUT.controller.r1[3:0]
-^2 /home/sid/code/SM83/config/reg8.filt
+^1 /home/sid/code/FPGbA/config/reg8.filt
 tb_core.UUT.controller.r2[3:0]
-^2 /home/sid/code/SM83/config/reg8.filt
+^1 /home/sid/code/FPGbA/config/reg8.filt
 tb_core.UUT.controller.rd[3:0]
 @800200
 -Registers
@@ -129,7 +128,7 @@ tb_core.UUT.regfile.\r8[11][7:0]
 @800200
 -ALU
 @2022
-^3 /home/sid/code/SM83/config/alu.filt
+^2 /home/sid/code/FPGbA/config/alu.filt
 tb_core.UUT.alu_inst.op[3:0]
 @c00420
 tb_core.UUT.alu_inst.in1[7:0]
@@ -180,7 +179,7 @@ tb_core.UUT.alu_inst.full_result[8:0]
 @22
 tb_core.UUT.idu_inst.addr_in[15:0]
 @2028
-^4 /home/sid/code/SM83/config/idu.filt
+^3 /home/sid/code/FPGbA/config/idu.filt
 tb_core.UUT.idu_inst.op[1:0]
 @22
 tb_core.UUT.idu_inst.out[15:0]
@@ -190,12 +189,12 @@ tb_core.UUT.idu_inst.sign
 @800200
 -Cond
 @2028
-^5 /home/sid/code/SM83/config/cond.filt
+^4 /home/sid/code/FPGbA/config/cond.filt
 tb_core.UUT.cond_check.cc[1:0]
 @22
 tb_core.UUT.cond_check.flags[3:0]
 @2028
-^6 /home/sid/code/SM83/config/bool.filt
+^5 /home/sid/code/FPGbA/config/bool.filt
 tb_core.UUT.cond_check.result
 @1000200
 -Cond

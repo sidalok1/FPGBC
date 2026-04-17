@@ -11,7 +11,8 @@ module ControlUnit(
         data_sel,
         addrh, addrl,
         rd_idu,
-        writeback,
+        read,
+        write,
         alu_op, flag_mask, idu_op,
         cc, cc_true,
         intr_req
@@ -25,7 +26,8 @@ module ControlUnit(
     input wire          clk;
     input wire          intr_req;
     input wire  [7:0]   data, IE, IF;
-    output reg          writeback = 0;
+    output reg          write = 0;
+    output wire         read;
     output reg          data_sel = DIN;
     output reg  [3:0]   r1 = CTR, r2 = CTR, rd = CTR, addrh = PCH, addrl = PCL;
     output reg  [7:0]   ctr;
@@ -38,7 +40,9 @@ module ControlUnit(
     input wire          cc_true;
 
     reg [7:0] IR;
-    reg fetch = 0;
+    reg fetch = 1;
+    reg read_from_mem = 0;
+    assign read = fetch | read_from_mem;
     
     reg [4:0] state = S0, next = S0;
     reg prefix = 0, prefix_next = 0;
@@ -114,7 +118,8 @@ module ControlUnit(
     always @* begin
         next = S0;
         fetch = 0;
-        writeback = 0;
+        write = 0;
+        read_from_mem = 0;
         r1 = CTR;
         r2 = CTR;
         ctr = 0;
@@ -130,6 +135,9 @@ module ControlUnit(
         set_IME = 0;
         unset_IME = 0;
         prefix_next = 0;
+
+        
+
         // begin state logic
         if ( prefix ) begin 
             // prefixed arithmetic
@@ -142,6 +150,7 @@ module ControlUnit(
                     addrl = L;
                     rd = Z;
                     data_sel = DIN;
+                    read_from_mem = 1;
                 end else begin
                     rd = (IR[7:6] == 2'b01) ? CTR : IR[2:0]; // no rd for BIT
                     r1 = IR[2:0];
@@ -162,7 +171,7 @@ module ControlUnit(
                 ctr = {5'b0, IR[5:3]};
                 alu_op = {2'b10, IR[7:6]};
                 flag_mask = ALLFLAG;
-                writeback = IR[7:6] != 2'b01; // no writeback for BIT
+                write = IR[7:6] != 2'b01; // no write for BIT
                 next = S2;
             end
             S2: begin
@@ -187,11 +196,15 @@ module ControlUnit(
                 next = S1;
                 rd_idu = PC;
                 rd = LSB[IR[5:4]];
+                data_sel = DIN;
+                read_from_mem = 1;
             end
             S1: begin
                 next = S2;
                 rd_idu = PC;
                 rd = MSB[IR[5:4]];
+                data_sel = DIN;
+                read_from_mem = 1;
             end
             S2: begin
                 rd_idu = PC;
@@ -210,7 +223,7 @@ module ControlUnit(
                 alu_op = PAS;
                 idu_op = r16mem_op[IR[5:4]];
                 rd_idu = r16mem_rd[IR[5:4]];
-                writeback = 1;
+                write = 1;
             end
             S1: begin
                 rd_idu = PC;
@@ -243,6 +256,7 @@ module ControlUnit(
                     addrl = L;
                     rd = Z;
                     data_sel = DIN;
+                    read_from_mem = 1;
                 end else begin
                     rd_idu = PC;
                     fetch = 1;
@@ -263,7 +277,7 @@ module ControlUnit(
                 r1 = Z;
                 r2 = ONE;
                 flag_mask = ZFLAG | NFLAG | HFLAG ;
-                writeback = 1;
+                write = 1;
             end
             S2: begin
                 rd_idu = PC;
@@ -281,6 +295,7 @@ module ControlUnit(
                     addrl = L;
                     rd = Z;
                     data_sel = DIN;
+                    read_from_mem = 1;
                 end else begin
                     rd_idu = PC;
                     fetch = 1;
@@ -301,7 +316,7 @@ module ControlUnit(
                 r1 = Z;
                 r2 = ONE;
                 flag_mask = ZFLAG | NFLAG | HFLAG ;
-                writeback = 1;
+                write = 1;
             end
             S2: begin
                 rd_idu = PC;
@@ -314,6 +329,8 @@ module ControlUnit(
             case ( state )
             S0: begin
                 rd_idu = PC;
+                data_sel = DIN;
+                read_from_mem = 1;
                 if ( IR[5:3] == 'b110 ) begin
                     next = S1;
                     rd = Z;
@@ -327,7 +344,7 @@ module ControlUnit(
                 r1 = Z;
                 addrh = H;
                 addrl = L;
-                writeback = 1;
+                write = 1;
             end
             S2: begin
                 rd_idu = PC;
@@ -373,12 +390,14 @@ module ControlUnit(
                 next = S1;
                 rd = Z;
                 data_sel = DIN;
+                read_from_mem = 1;
                 rd_idu = PC;
             end
             S1: begin
                 next = S2;
                 rd = W;
                 data_sel = DIN;
+                read_from_mem = 1;
                 rd_idu = PC;
             end
             S2: begin
@@ -386,7 +405,7 @@ module ControlUnit(
                 addrh = W;
                 addrl = Z;
                 r1 = SPL;
-                writeback = 1;
+                write = 1;
                 rd_idu = WZ;
             end
             S3: begin
@@ -394,7 +413,7 @@ module ControlUnit(
                 addrh = W;
                 addrl = Z;
                 r1 = SPH;
-                writeback = 1;
+                write = 1;
             end
             S4: begin
                 rd_idu = PC;
@@ -435,6 +454,7 @@ module ControlUnit(
                 addrh = MSBm[IR[5:4]];
                 addrl = LSBm[IR[5:4]];
                 data_sel = DIN;
+                read_from_mem = 1;
                 idu_op = r16mem_op[IR[5:4]];
                 rd_idu = r16mem_rd[IR[5:4]];
                 rd = A;
@@ -480,6 +500,7 @@ module ControlUnit(
             S0: begin
                 next = S1;
                 data_sel = DIN;
+                read_from_mem = 1;
                 rd = Z;
                 rd_idu = PC;
             end
@@ -508,6 +529,7 @@ module ControlUnit(
             case ( state )
             S0: begin
                 data_sel = DIN;
+                read_from_mem = 1;
                 rd = Z;
                 rd_idu = PC;
                 cc = IR[4:3];
@@ -554,13 +576,14 @@ module ControlUnit(
                     addrh = H;
                     addrl = L;
                     r1 = IR[2:0];
-                    writeback = 1;
+                    write = 1;
                 end 
                 else if ( IR[2:0] == 'b110 ) begin
                     next = S2;
                     addrh = H;
                     addrl = L;
                     data_sel = DIN;
+                    read_from_mem = 1;
                     rd = IR[5:3];
                 end
                 else begin
@@ -594,6 +617,7 @@ module ControlUnit(
                     addrh = H;
                     addrl = L;
                     data_sel = DIN;
+                    read_from_mem = 1;
                 end else begin
                     r1 = A;
                     r2 = IR[2:0];
@@ -641,6 +665,7 @@ module ControlUnit(
                 addrl = SPL;
                 rd_idu = SP;
                 data_sel = DIN;
+                read_from_mem = 1;
                 rd = Z;
                 next = S1;
             end
@@ -649,6 +674,7 @@ module ControlUnit(
                 addrl = SPL;
                 rd_idu = SP;
                 data_sel = DIN;
+                read_from_mem = 1;
                 rd = W;
                 next = S2;
             end
@@ -674,6 +700,7 @@ module ControlUnit(
                 addrl = SPL;
                 rd_idu = SP;
                 data_sel = DIN;
+                read_from_mem = 1;
                 rd = Z;
                 next = S1;
             end
@@ -682,6 +709,7 @@ module ControlUnit(
                 addrl = SPL;
                 rd_idu = SP;
                 data_sel = DIN;
+                read_from_mem = 1;
                 rd = W;
                 next = S2;
             end
@@ -707,6 +735,7 @@ module ControlUnit(
                 addrl = SPL;
                 rd = LSBs[IR[5:4]];
                 data_sel = DIN;
+                read_from_mem = 1;
                 rd_idu = SP;
                 next = S1;
             end
@@ -715,6 +744,7 @@ module ControlUnit(
                 addrl = SPL;
                 rd = MSBs[IR[5:4]];
                 data_sel = DIN;
+                read_from_mem = 1;
                 rd_idu = SP;
                 next = S2;
             end
@@ -740,12 +770,14 @@ module ControlUnit(
             case ( state )
             S0: begin
                 data_sel = DIN;
+                read_from_mem = 1;
                 rd = Z;
                 rd_idu = PC;
                 next = S1;
             end
             S1: begin
                 data_sel = DIN;
+                read_from_mem = 1;
                 rd = W;
                 rd_idu = PC;
                 cc = IR[4:3];
@@ -773,12 +805,14 @@ module ControlUnit(
             case ( state )
                 S0: begin
                 data_sel = DIN;
+                read_from_mem = 1;
                 rd = Z;
                 rd_idu = PC;
                 next = S1;
             end
             S1: begin
                 data_sel = DIN;
+                read_from_mem = 1;
                 rd = W;
                 rd_idu = PC;
                 next = S2;
@@ -801,12 +835,14 @@ module ControlUnit(
             case ( state )
             S0: begin
                 data_sel = DIN;
+                read_from_mem = 1;
                 rd = Z;
                 rd_idu = PC;
                 next = S1;
             end
             S1: begin
                 data_sel = DIN;
+                read_from_mem = 1;
                 // some wonky logic to avoid extra state
                 // might need to change later
                 cc = IR[4:3];
@@ -830,7 +866,7 @@ module ControlUnit(
                 addrh = SPH;
                 addrl = SPL;
                 r1 = PCH;
-                writeback = 1;
+                write = 1;
                 idu_op = DEC;
                 rd_idu = SP;
                 next = S4;
@@ -839,7 +875,7 @@ module ControlUnit(
                 addrh = SPH;
                 addrl = SPL;
                 r1 = PCL;
-                writeback = 1;
+                write = 1;
                 next = S5;
             end
             S5: begin
@@ -855,12 +891,14 @@ module ControlUnit(
             case ( state )
                 S0: begin
                 data_sel = DIN;
+                read_from_mem = 1;
                 rd = Z;
                 rd_idu = PC;
                 next = S1;
             end
             S1: begin
                 data_sel = DIN;
+                read_from_mem = 1;
                 rd = W;
                 rd_idu = PC;
                 next = S2;
@@ -876,7 +914,7 @@ module ControlUnit(
                 addrh = SPH;
                 addrl = SPL;
                 r1 = PCH;
-                writeback = 1;
+                write = 1;
                 idu_op = DEC;
                 rd_idu = SP;
                 next = S4;
@@ -885,7 +923,7 @@ module ControlUnit(
                 addrh = SPH;
                 addrl = SPL;
                 r1 = PCL;
-                writeback = 1;
+                write = 1;
                 next = S5;
             end
             S5: begin
@@ -912,14 +950,14 @@ module ControlUnit(
                 idu_op = DEC;
                 rd_idu = SP;
                 r1 = MSBs[IR[5:4]];
-                writeback = 1;
+                write = 1;
                 next = S2;
             end
             S2: begin
                 addrh = SPH;
                 addrl = SPL;
                 r1 = LSBs[IR[5:4]];
-                writeback = 1;
+                write = 1;
                 next = S3;
             end
             S3: begin
@@ -933,6 +971,7 @@ module ControlUnit(
             case ( state )
             S0: begin
                 data_sel = DIN;
+                read_from_mem = 1;
                 next = S1;
                 rd = Z;
                 rd_idu = PC;
@@ -958,6 +997,7 @@ module ControlUnit(
             case ( state )
             S0: begin
                 data_sel = DIN;
+                read_from_mem = 1;
                 rd = Z;
                 rd_idu = PC;
                 next = S1;
@@ -967,7 +1007,7 @@ module ControlUnit(
                 ctr = 8'hFF;
                 addrl = Z;
                 r1 = A;
-                writeback = 1;
+                write = 1;
                 next = S2;
             end
             S2: begin
@@ -981,6 +1021,7 @@ module ControlUnit(
             case ( state )
             S0: begin
                 data_sel = DIN;
+                read_from_mem = 1;
                 rd = Z;
                 rd_idu = PC;
                 next = S1;
@@ -989,6 +1030,7 @@ module ControlUnit(
                 addrh = CTR;
                 ctr = 8'hFF;
                 data_sel = DIN;
+                read_from_mem = 1;
                 rd = A;
                 next = S2;
             end
@@ -1006,7 +1048,7 @@ module ControlUnit(
                 ctr = 8'hFF;
                 addrl = C;
                 r1 = A;
-                writeback = 1;
+                write = 1;
                 next = S1;
             end
             S1: begin
@@ -1024,6 +1066,7 @@ module ControlUnit(
                 addrl = C;
                 rd = A;
                 data_sel = DIN;
+                read_from_mem = 1;
                 next = S1;
             end
             S1: begin
@@ -1037,12 +1080,14 @@ module ControlUnit(
             case ( state )
             S0: begin
                 data_sel = DIN;
+                read_from_mem = 1;
                 rd = Z;
                 rd_idu = PC;
                 next = S1;
             end
             S1: begin
                 data_sel = DIN;
+                read_from_mem = 1;
                 rd = W;
                 rd_idu = PC;
                 next = S2;
@@ -1051,7 +1096,7 @@ module ControlUnit(
                 addrh = W;
                 addrl = Z;
                 r1 = A;
-                writeback = 1;
+                write = 1;
                 next = S3;
             end
             S3: begin
@@ -1065,12 +1110,14 @@ module ControlUnit(
             case ( state )
             S0: begin
                 data_sel = DIN;
+                read_from_mem = 1;
                 rd = Z;
                 rd_idu = PC;
                 next = S1;
             end
             S1: begin
                 data_sel = DIN;
+                read_from_mem = 1;
                 rd = W;
                 rd_idu = PC;
                 next = S2;
@@ -1079,6 +1126,7 @@ module ControlUnit(
                 addrh = W;
                 addrl = Z;
                 data_sel = DIN;
+                read_from_mem = 1;
                 rd = A;
                 next = S3;
             end
@@ -1093,6 +1141,7 @@ module ControlUnit(
             case ( state )
             S0: begin
                 data_sel = DIN;
+                read_from_mem = 1;
                 rd = Z;
                 rd_idu = PC;
                 next = S1;
@@ -1125,6 +1174,7 @@ module ControlUnit(
             case ( state )
             S0: begin
                 data_sel = DIN;
+                read_from_mem = 1;
                 rd = Z;
                 rd_idu = PC;
                 next = S1;
@@ -1204,14 +1254,14 @@ module ControlUnit(
                 idu_op = DEC;
                 rd_idu = SP;
                 r1 = PCH;
-                writeback = 1;
+                write = 1;
                 next = S2;
             end
             S2: begin
                 addrh = SPH;
                 addrl = SPL;
                 r1 = PCL;
-                writeback = 1;
+                write = 1;
                 next = S3;
             end
             S3: begin

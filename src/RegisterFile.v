@@ -28,9 +28,11 @@ module RegisterFile (
     
     reg [7:0] r8 [0:15]; 
 
-    assign alu1 = r8[r1];
-    assign alu2 = r8[r2];
-    assign addr = {r8[addrh], r8[addrl]};
+    assign alu1 = (r1 == CTR) ? ctr : r8[r1];
+    assign alu2 = (r2 == CTR) ? ctr : r8[r2];
+    assign addr[15:8] = (addrh == CTR) ? ctr : r8[addrh];
+    assign addr[ 7:0] = (addrl == CTR) ? ctr : r8[addrl];
+
 
     integer i;
     initial begin
@@ -67,10 +69,6 @@ module RegisterFile (
         FF:; // garbage writes
         default:; // All cases captured
         endcase
-    end
-
-    always @( ctr ) begin
-        r8[CTR] = ctr;
     end
 
 endmodule

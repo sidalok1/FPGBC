@@ -1,4 +1,4 @@
-module Core( clk, din, dout, addrbus, write_mem, wake );
+module Core( clk, databus, addrbus, write_mem, read_mem, wake );
 
     `include "Control_params.vh"
     `include "ALU_params.vh"
@@ -7,10 +7,10 @@ module Core( clk, din, dout, addrbus, write_mem, wake );
 
     input clk;
     input wake;
-    input wire [7:0] din;
-    output wire [7:0] dout;
+    inout wire [7:0] databus;
     output wire [15:0] addrbus;
     output wire write_mem;
+    output wire read_mem;
     
     wire sig_writeback, sig_data_sel;
     wire [3:0] sig_r1, sig_r2, sig_rd, sig_addrh, sig_addrl;
@@ -48,21 +48,23 @@ module Core( clk, din, dout, addrbus, write_mem, wake );
 
     assign write_mem = sig_writeback;
 
-    assign reg_din = sig_data_sel == DIN ? din : alu_out;
+    assign reg_din = sig_data_sel == DIN ? databus : alu_out;
 
     assign dout = alu_out;
 
+    assign databus = (write_mem) ? dout : 'bz;
 
     ControlUnit controller (
         .clk( clk ),
         .IE( IE ), .IF ( IF ),
         .ack_IF( sig_rst_IF ),
-        .data( din ),
+        .data( databus ),
         .data_sel( sig_data_sel ),
         .ctr( ctr_data ),
         .r1( sig_r1 ), .r2( sig_r2 ), .rd( sig_rd ), .rd_idu( sig_rd_idu ),
         .addrh( sig_addrh ), .addrl( sig_addrl ),
-        .writeback( sig_writeback ),
+        .read( read_mem ),
+        .write( sig_writeback ),
         .alu_op( sig_alu_op ), .flag_mask( sig_flag_mask ),
         .idu_op( sig_idu_op ),
         .cc( cc ), .cc_true( cc_result ),

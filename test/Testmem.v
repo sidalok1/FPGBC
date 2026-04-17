@@ -1,13 +1,12 @@
-module Testmem ( clk, addr, wen, in, out );
+module Testmem ( clk, addr, wen, data, ren );
 
-    input clk, wen;
+    input clk, wen, ren;
     input [15:0] addr;
-    input [7:0] in;
-    output wire [7:0] out;
+    inout [7:0] data;
 
     reg [7:0] mem [0:65535];
 
-    assign out = mem[addr];
+    assign data = (ren) ? mem[addr] : 'bz;
 
     integer i;
     initial begin
@@ -16,7 +15,7 @@ module Testmem ( clk, addr, wen, in, out );
 
     always @( posedge clk ) begin
         if ( wen ) begin
-            mem[addr] = in;
+            mem[addr] = data;
         end
     end
 
