@@ -43,8 +43,11 @@ impl Debug for Instruction {
 	}
 }
 
-pub fn hex_to_u8(hex: &str) -> u8 {
-	u8::from_str_radix(hex, 16).unwrap()
+pub fn hex_to_u8(hex: &str) -> Option<u8> {
+	match u8::from_str_radix(hex, 16) {
+		Ok(num) => Some(num),
+		_ => None
+	}
 }
 
 pub fn hex_to_u16(hex: &str) -> u16 {
@@ -114,7 +117,11 @@ impl RunState {
 		// }
 		// IR register holds only instructions, not immediates
 		// The prefix part might still be necessary in the future
-		format!("{}", self.decode_xxxxxxxx(hex_to_u8(inst)))
+		match hex_to_u8(inst) {
+			Some(val) 	=> format!("{}", self.decode_xxxxxxxx(val)),
+			None 		=> format!("???")
+		}
+		// format!("{}", self.decode_xxxxxxxx(hex_to_u8(inst)))
 	}
 
 	fn decode_xxxxxxxx(&mut self, inst: u8) -> Instruction {
