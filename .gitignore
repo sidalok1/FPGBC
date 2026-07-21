@@ -85,8 +85,15 @@ SM83.xpr
 # **.sav
 .vscode
 **.mem
+**.gb
+!**/cgb_boot.mem
 
 gbfilt/target/
 
 .venv
 **/__pycache__
+
+.settings
+.library_mapping.xml
+.project
+settings.json

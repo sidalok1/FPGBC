@@ -1,6 +1,6 @@
 `timescale 1ns / 1ps
 
-module tb_core();
+module tb();
 
     reg clk = 1, wake = 0;
     wire [15:0] core_addrbus;

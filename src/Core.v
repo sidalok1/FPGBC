@@ -1,25 +1,38 @@
-module Core( clk, databus, addrbus, write_mem, read_mem, wake );
+`default_nettype none
+module Core( 
+    input wire clk, rst, en, 
+    input wire [7:0] din,
+    output reg [7:0] dout, 
+    output wire [15:0] addrbus, 
+    output reg we, re,
+    input wire [4:0] intr_req,
+    output wire dbl_spd,
+    output reg stop
+);
 
+    reg [7:0] databus;
+
+    `include "RegMap.vh"
     `include "Control_params.vh"
     `include "ALU_params.vh"
     `include "IDU_params.vh"
     `include "RegFile_params.vh"
 
-    input clk;
-    input wake;
-    inout wire [7:0] databus;
-    output wire [15:0] addrbus;
-    output wire write_mem;
-    output wire read_mem;
+    integer i;
+
+    reg [1:0] cpu_phase = 0, cpu_phase_n;
+    reg last_dot_of_phase;
+    reg cpu_en = 0;
     
-    wire sig_writeback, sig_data_sel;
+    wire sig_writeback, sig_data_sel, sig_readmem;
     wire [3:0] sig_r1, sig_r2, sig_rd, sig_addrh, sig_addrl;
     wire [4:0] sig_flag_mask;
     wire [ALU_OPWIDTH:0] sig_alu_op;
     wire [IDU_OPWIDTH:0] sig_idu_op;
     wire [7:0] ctr_data;
     wire [2:0] sig_rd_idu;
-    wire [7:0] sig_rst_IF;
+    wire [7:0] sig_ack_IF;
+    wire sig_stop, sig_halt;
 
     wire [7:0] reg_din;
 
@@ -32,47 +45,46 @@ module Core( clk, databus, addrbus, write_mem, read_mem, wake );
     wire [1:0] cc;
     wire cc_result;
 
-    // Interupt registers. Bits 7-5 are unused
-    //  | 7 6 5 |   4   |   3   |   2   |   1   |   0   |
-    //  | 1 1 1 | Joypad| Serial| Timer |  LCD  | VBlank|
-    reg [7:0] IE = 0, IF = 0;
-    // Joypad register. Write 0 to bit 5 or 4 for buttons or d-pad respectively
-    // Reads from bit 3 to 0 are active low. Will read FFh if both bit 5 and 4 
-    //are high
-    //  |  7  6  |   5   |   4   |   3   |   2   |   1   |   0   |
-    //  |  1  1  |   0   |   1   |/Start |/Select|  /B   |  /A   |
-    //  |  1  1  |   1   |   0   | /Down |  /Up  | /Left | /Right|
-    //  |  1  1  |   1   |   1   |   1   |   1   |   1   |   1   |
-    // Setting both bits 5 and 4 to zero is a logical and of input signals
-    reg [7:0] P1 = 8'hFF;
+    reg [7:0] hram [0:126];
 
-    assign write_mem = sig_writeback;
+    //  |   SPEED   |     ?     |     ?     |     ?     |     ?     |     ?     |     ?     |   ARMED   |
+    //  |     R     |                                                                       |    R/W    |
+    // cpu speed control
+    reg [7:0] KEY1_reg = 8'h0; // reads return {7'b1, [VRAM BANK NUMBER]}
+    reg speed_n = 0;
+    wire speed = KEY1_reg[7];
+    assign dbl_spd = speed;
+    wire armed = KEY1_reg[0];
+
+    // Interupt registers. Bits 7-5 are unused
+    //  |     7     |     6     |     5     |     4     |     3     |     2     |     1     |     0     |
+    //  |     -     |     -     |     -     |  JYP_intr |  SER_intr |  TIM_intr |  LCD_intr |  VBK_intr |
+    reg [7:0] IE_reg = 0, IF_reg = 0;
+    // wire sig_wake = |( IE[4:0] & IF[4:0]); should happen on positive edges
+    reg sig_wake = 0, sig_wake_n = 0;
 
     assign reg_din = sig_data_sel == DIN ? databus : alu_out;
 
-    assign dout = alu_out;
-
-    assign databus = (write_mem) ? dout : 'bz;
-
     ControlUnit controller (
-        .clk( clk ),
-        .IE( IE ), .IF ( IF ),
-        .ack_IF( sig_rst_IF ),
+        .clk( clk ), .en( cpu_en ), .rst( rst ),
+        .IE( IE_reg ), .IF ( IF_reg ),
+        .ack_IF( sig_ack_IF ),
         .data( databus ),
         .data_sel( sig_data_sel ),
         .ctr( ctr_data ),
         .r1( sig_r1 ), .r2( sig_r2 ), .rd( sig_rd ), .rd_idu( sig_rd_idu ),
         .addrh( sig_addrh ), .addrl( sig_addrl ),
-        .read( read_mem ),
+        .read( sig_readmem ),
         .write( sig_writeback ),
         .alu_op( sig_alu_op ), .flag_mask( sig_flag_mask ),
         .idu_op( sig_idu_op ),
         .cc( cc ), .cc_true( cc_result ),
-        .intr_req( wake )
+        .wake( sig_wake ),
+        .stop( sig_stop ), .halt( sig_halt )
     );
 
     RegisterFile regfile (
-        .clk( clk ),
+        .clk( clk ), .en( cpu_en ), .rst( rst ),
         .r1( sig_r1 ), .r2( sig_r2 ), .rd( sig_rd ), .rd_idu( sig_rd_idu ),
         .addrh( sig_addrh ), .addrl( sig_addrl ), .addr( addrbus ),
         .alu1( alu_in1 ), .alu2( alu_in2 ),
@@ -99,10 +111,90 @@ module Core( clk, databus, addrbus, write_mem, read_mem, wake );
         .flags( saved_flags ),
         .result( cc_result )
     );
+
+    initial begin
+        for ( i = 0; i < 127; i = i + 1 )
+            hram[i] = 0;
+    end
     
     always @ ( posedge clk ) begin
-        if ( sig_rst_IF ) begin
-            IF <= IF & (~sig_rst_IF);
+        if ( rst ) begin
+            IF_reg <= 0;
+            KEY1_reg <= 0;
+            cpu_phase <= 0;
+        end
+        else begin
+            sig_wake <= sig_wake_n; 
+            if ( en ) begin
+                cpu_phase <= cpu_phase_n;
+                KEY1_reg[7] <= speed_n;
+                for ( i = 0; i < 5; i = i + 1 ) begin
+                    if ( sig_ack_IF[i] )
+                        IF_reg[i] <= 0;
+                    if ( intr_req[i] )
+                        IF_reg[i] <= 1;
+                end
+                if ( sig_writeback ) begin
+                    case ( addrbus )
+                    IF:     IF_reg <= databus;
+                    IE:     IE_reg <= databus;
+                    KEY1:   KEY1_reg[6:0] <= databus[6:0];
+                    default: begin
+                        if ( addrbus >= 16'hFF80 && addrbus <= 16'hFFFE ) begin
+                            hram[addrbus - 16'hFF80] <= databus;
+                        end
+                    end
+                    endcase
+                end
+            end 
+        end
+    end
+
+    always @* begin
+        speed_n = speed;
+        sig_wake_n = 0;
+        stop = 0;
+        we = 0;
+        re = 0;
+        dout = 0;
+        databus = alu_out;
+        last_dot_of_phase = (speed == 0 && cpu_phase == 'd3) || (speed == 1 && cpu_phase == 'd1);
+
+        if ( sig_stop == 1 )
+            if ( armed == 1 )
+                speed_n = ~speed;
+            else
+                stop = 1;
+
+        cpu_en = en && (cpu_phase == 'd0) && !(stop || sig_halt);
+
+        sig_wake_n = |(intr_req & ~IF_reg[4:0]);
+        if ( last_dot_of_phase )
+            cpu_phase_n = 0;
+        else
+            cpu_phase_n = cpu_phase + 1;
+
+        if ( sig_writeback && last_dot_of_phase ) begin // writes only issued on last dot of phase
+            dout = alu_out;
+            case ( addrbus )
+            IF, IE, KEY1: we = 0; // CPU will handle these writes
+            default: we = 1; 
+            endcase
+        end
+        else if ( sig_readmem ) begin
+            re = 0;
+            case ( addrbus )
+                IF:     databus = IF_reg;
+                IE:     databus = IE_reg;
+                KEY1:   databus = KEY1_reg;
+                default: begin
+                    if ( addrbus <= 16'hFF80 && addrbus <= 16'hFFFE ) begin
+                        databus = hram[addrbus - 16'hFF80];
+                    end
+                    databus = din;
+                    re = 1;
+                end
+            endcase
         end
     end
 

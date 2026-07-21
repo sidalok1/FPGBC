@@ -1,4 +1,4 @@
-
+`default_nettype none
 module CondCheck ( cc, flags, result );
 
 	`include "Cond_params.vh"

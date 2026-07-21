@@ -1,10 +1,18 @@
+`default_nettype none
 module PPU (
+    input wire clk, rst, en,
+
     input wire [15:0] addr_in,
     output reg [15:0] addr_out,
     input wire [7:0] data_in,
     output reg [7:0] data_out,
     input wire wen, ren,
-    output reg wout, rout // DMA external bus control, takes priority over CPU control
+    input wire dbl_spd,
+    output reg wout, rout,
+
+    output reg hsync, vsync,
+    output reg [4:0] r, g, b,
+    output reg de
 );
 
     `include "RegMap.vh"
@@ -15,11 +23,14 @@ module PPU (
     //  | LCD_EN    |  WIN_MAP  |  WIN_EN   |  TILE_SEL |   BG_MAP  | OBJ_SIZE  |  OBJ_EN   |   BG_EN   |
     //  |                                              R/W                                              |  
     reg [7:0] LCDC_reg = 8'b0;
+    wire LCD_EN, WIN_MAP, WIN_EN, TILE_SEL, BG_MAP, OBJ_SIZE, OBJ_EN, BG_EN;
+    assign {LCD_EN, WIN_MAP, WIN_EN, TILE_SEL, BG_MAP, OBJ_SIZE, OBJ_EN, BG_EN} = LCDC_reg;
 
     //  |     -     | INTR_LYC  |  INTR_M2  |  INTR_M1  |  INTR_M0  | LYC_STAT  |       LCD_MODE        |
     //  |     U     |                      R/W                      |                 R                 |
-    reg [7:0] STAT_reg = 8'b0;   
-
+    reg [7:0] STAT_reg = 8'b0;
+    wire INTR_LYC_EN, INTR_M2_EN, INTR_M1_EN, INTR_M0_EN, LYC_STAT_EN;
+    assign {INTR_LYC_EN, INTR_M2_EN, INTR_M1_EN, INTR_M0_EN, LYC_STAT_EN} = STAT_reg[6:3];
     //  |                                              SCY                                              |
     //  |                                              R/W                                              |
     reg [7:0] SCY_reg = 8'b0;  
@@ -31,6 +42,7 @@ module PPU (
     //  |                                              LY                                               |
     //  |                                               R                                               |
     reg [7:0] LY_reg = 8'b0;
+    reg inc_LY;
 
     //  |                                              LYC                                              |
     //  |                                              R/W                                              |
@@ -40,24 +52,1064 @@ module PPU (
     //  |                                              R/W                                              |
     reg [7:0] DMA_reg = 8'b0; // unspecified startup value
 
+    //  |                                              BGP                                              |
+    //  |                                              R/W                                              |
+    reg [7:0] BGP_reg = 8'b0;
+
+    //  |                                             OBP0                                              |
+    //  |                                              R/W                                              |
+    reg [7:0] OBP0_reg = 8'b0; 
+
+    //  |                                             OBP1                                              |
+    //  |                                              R/W                                              |
+    reg [7:0] OBP1_reg = 8'b0; 
+
     //  |                                               WX                                              |
     //  |                                              R/W                                              |
-    reg [7:0] WX_reg = 8'b0; // cant find much documentation
+    reg [7:0] WX_reg = 8'b0;
 
     //  |                                               WY                                              |
     //  |                                              R/W                                              |
-    reg [7:0] WY_reg = 8'b0; // cant find much documentation
+    reg [7:0] WY_reg = 8'b0;
 
+    //  |     ?     |     ?     |     ?     |     ?     |     ?     | DMG_MODE  |     ?     |     ?     |
+    //  |                                                R                                              |
+    // writes lock after first write to BANK
+    reg [7:0] KEY0_reg = 8'h0; // reads return {7'b1, [VRAM BANK NUMBER]}
+    reg KEY0_locked = 0;
+    wire DMG_mode = KEY0_reg[2];
+
+    //  |                                              VBK                                              |
+    //  |                                              R/W                                              |
+    reg [7:0] VBK_reg = 8'hFE; // reads return {7'b1, [VRAM BANK NUMBER]}
+
+    //  | AUTO_INC  |     -     |                              BGP_ADDR                                 |
+    //  |                                              R/W                                              |
+    reg [7:0] BGPI_reg = 8'b0;
+    wire BGP_AUTO_INC = BGPI_reg[7];
+    wire [5:0] BGP_ADDR = BGPI_reg[5:0];
+
+    //  |                                             BGPD                                              |
+    //  |                                              R/W                                              |
+    // reg [7:0] BGPD_reg;
+
+    //  | AUTO_INC  |     -     |                              OBP_ADDR                                 |
+    //  |                                              R/W                                              |
+    reg [7:0] OBPI_reg = 8'b0;
+    wire OBP_AUTO_INC = OBPI_reg[7];
+    wire [5:0] OBP_ADDR = OBPI_reg[5:0];
+    //  |                                             OBPD                                              |
+    //  |                                              R/W                                              |
+    // reg [7:0] OBPD_reg;
+
+    //  |     ?     |     ?     |     ?     |     ?     |     ?     |     ?     |     ?     |  PRI_MODE |
+    //  |                                              R/W                                              |
+    // Online documentation seems to suggest that this register locks after unmapping the boot rom. I am
+    // for now keeping it unlocked.
+    reg [7:0] OPRI_reg = 8'h0;
+    wire OBJ_PRI_MODE = OPRI_reg[0];
+
+    reg [1:0] clock_phase = 0, clock_phase_n;
 
     reg [7:0] vram_bank_0 [0:'h1FFF], vram_bank_1 [0:'h1FFF];
-    reg [7:0] hram_OAM [0:159];
+    reg vram0_we, vram1_we;
+    reg [12:0] vram_addr;
+    reg [7:0] vram_din;
+    reg [7:0] vram0_dout = vram_bank_0[vram_addr];
+    reg [7:0] vram1_dout = vram_bank_1[vram_addr];
+    reg addr_in_is_vram;
+    reg [7:0] OAM [0:159];
+    reg oam_we;
+    reg [7:0] oam_addr;
+    reg [7:0] oam_din;
+    wire [7:0] oam_dout = OAM[oam_addr];
+    reg addr_in_is_oam;
 
-    reg [8:0] dot_counter;
-    reg [7:0] line_counter;
-    reg [8:0] mode_len;
+    reg [8:0] dot_counter = 0, dot_counter_n;
+    reg [3:0] objs_on_scanline = 0, objs_on_scanline_n;
+    reg [7:0] oam_idx = 0, oam_idx_n;
 
+    reg [7:0] obj_arr [0:9][0:4]; // ypos, xpos, tile, attr, obj num
+    reg [9:0] obj_valid = 0, obj_valid_n, obj_x_hit;
+    reg [3:0] current_obj = 0, current_obj_n;
+    wire [3:0] obj_with_priority;
+    wire obj_priority_valid;
+    PriorityEncoder #(
+        .WIDTH(10)
+    ) obj_priority_encoder (
+        .i(obj_valid & obj_x_hit),
+        .o(obj_with_priority),
+        .v(obj_priority_valid)
+    );
+    wire [7:0] obj_y = obj_arr[current_obj][0];
+    // wire [7:0] obj_x = obj_arr[current_obj][1]; unused
+    wire [7:0] obj_tile = obj_arr[current_obj][2];
+    wire [7:0] obj_attr = obj_arr[current_obj][3];
+    wire [7:0] obj_addr = obj_arr[current_obj][4];
+    
+    reg write_obj_arr;
+    reg [1:0] obj_arr_elem;
+    reg [7:0] obj_arr_data;
+
+    reg [7:0] obj_height;
+    reg obj_is_on_line;
+
+    // PPU states
     localparam oamScan = 2'd2;
+
+        // Mode 2 substates
+        localparam get_y_position = 'b00001;
+        localparam get_x_position = 'b00010;
+        localparam get_obj_tile   = 'b00100;
+        localparam get_obj_attr   = 'b01000;
+        localparam await_mode_3   = 'b10000;
+    reg [4:0] oamScan_substate, oamScan_substate_n;
+
     localparam drawing = 2'd3;
+
+        // Mode 3 substates
+        localparam fetcher_bgr_map_addr     = 'b001_000001;
+        localparam fetcher_bgr_read_map     = 'b001_000010;
+        localparam fetcher_bgr_data_addr    = 'b001_000100;
+        localparam fetcher_bgr_low_data     = 'b001_001000;
+        localparam fetcher_bgr_high_data    = 'b001_010000;
+        localparam fetcher_bgr_push_fifo    = 'b001_100000;
+        localparam fetcher_win_map_addr     = 'b010_000001;
+        localparam fetcher_win_read_map     = 'b010_000010;
+        localparam fetcher_win_data_addr    = 'b010_000100;
+        localparam fetcher_win_low_data     = 'b010_001000;
+        localparam fetcher_win_high_data    = 'b010_010000;
+        localparam fetcher_win_push_fifo    = 'b010_100000;
+        localparam fetcher_obj_wait         = 'b100_000001;
+        localparam fetcher_obj_data_addr    = 'b100_000010;
+        localparam fetcher_obj_low_data     = 'b100_000100;
+        localparam fetcher_obj_high_data    = 'b100_001000;
+        localparam fetcher_obj_merge_fifo   = 'b100_010000;
+        localparam fetcher_obj_push_fifo    = 'b100_100000;
+        reg [8:0] fetcher_state = fetcher_bgr_map_addr, fetcher_state_n;
+        reg [8:0] fetcher_return = fetcher_bgr_map_addr, fetcher_return_n;
+
+        wire bgr_state = fetcher_state[6];
+        wire win_state = fetcher_state[7];
+        wire obj_state = fetcher_state[8];
+
+        reg [5:0] bgr_fifo [0:7]; // {color_index[5:4], palette_num[3:1], priority[0]}
+        wire [1:0] bgr_pix_idx = bgr_fifo[0][5:4];
+        wire [2:0] bgr_pix_pal = bgr_fifo[0][3:1];
+        wire bgr_pix_pri = bgr_fifo[0][0];
+        reg [3:0] bgr_fifo_len;
+        reg bgr_fifo_read;
+        reg bgr_fifo_push;
+        reg bgr_fifo_flush = 0, bgr_fifo_flush_n;
+
+        reg [7:0] fetch_counter = 0, fetch_counter_n;
+        reg [7:0] pix_x;
+        reg [7:0] tile_x;
+        reg [7:0] pix_y;
+        reg [7:0] tile_y; 
+        reg [7:0] row_offset;
+        reg [12:0] tile_addr = 0, tile_addr_n;
+        reg [7:0] tile_attr = 0, tile_attr_n;
+        reg [7:0] tile_idx = 0, tile_idx_n;
+        reg [7:0] data_low = 0, data_low_n;
+        reg [7:0] data_high = 0, data_high_n;
+        wire signed [7:0] tile_offset = tile_idx;
+
+        reg [7:0] win_x = 0, win_x_n;
+        reg [7:0] win_y = 0, win_y_n;
+        reg win_y_cond = 0, win_y_cond_n;
+        reg win_trigger;
+
+        // use of signed enforces the addition operation to take place. using tile_offset
+        // will perform operation as signed and using tile_idx will perform unsigned
+        reg [12:0] map_base;
+        reg signed [12:0] data_base;
+        reg [12:0] tile_base;
+
+        reg obj_trigger;
+        
+        reg [11:0] obj_fifo [0:7]; // {oam_addr[11:6], color_index[5:4], palette_num[3:1], priority[0]}
+        wire [1:0] obj_pix_idx = obj_fifo[0][5:4];
+        wire [2:0] obj_pix_pal = obj_fifo[0][3:1];
+        wire obj_pix_pri = obj_fifo[0][0];
+        reg obj_fifo_merge [0:7]; // 1 for each position to be overwritten by merge
+        reg obj_fifo_merge_n [0:7];
+        reg [7:0] obj_low = 0, obj_low_n, obj_high = 0, obj_high_n;
+        reg [2:0] obj_fifo_len;
+        reg obj_fifo_flush = 0, obj_fifo_flush_n;
+        reg obj_fifo_read;
+        reg obj_fifo_push;
+
+        reg [7:0] output_x = 0, output_x_n;
+        reg halt_output;
+        // same format as fifo pixels, but idx 0 is 0 for background/window and 1 for objects
+        reg [5:0] mixed_pixel = 0, mixed_pixel_n, mixed_pixel0 = 0, mixed_pixel0_n;
+        reg [3:0] pallet_idx = 0, pallet_idx_n;
+        reg [7:0] rgb_low = 0, rgb_low_n, rgb_low0 = 0, rgb_low0_n;
+        reg [7:0] rgb_high = 0, rgb_high_n;
+        reg [4:0] r_n, g_n, b_n;
+        reg de2 = 0, de2_n, de1 = 0, de0 = 0;
+
+        wire [7:0] DMG_RGB [0:9];
+        assign DMG_RGB[0] = {3'b000, 5'b11000}; // white
+        assign DMG_RGB[1] = {1'b0, 5'b11000, 2'b11};
+        assign DMG_RGB[2] = {3'b000, 5'b10000}; // light gray
+        assign DMG_RGB[3] = {1'b0, 5'b10000, 2'b10};
+        assign DMG_RGB[4] = {3'b000, 5'b01000}; // dark gray
+        assign DMG_RGB[5] = {1'b0, 5'b01000, 2'b01};
+        assign DMG_RGB[6] = {3'b000, 5'b00000}; // black
+        assign DMG_RGB[7] = {1'b0, 5'b00000, 2'b00};
+        assign DMG_RGB[8] = 8'hFF; // blank
+        assign DMG_RGB[9] = 8'hFF;
+
+        reg [7:0] BGP_RGB [0:63];
+        reg [7:0] OBP_RGB [0:63];
+
     localparam h_blank = 2'd0;
+        reg hsync_n;
     localparam v_blank = 2'd1;
+        reg vsync_n;
+    reg DMA_state = 0, DMA_state_n;
+    reg [7:0] DMA_counter = 0, DMA_counter_n;
+
+    integer i;
+
+    reg [1:0] current_mode;
+    reg [1:0] next_mode;
+
+    genvar n;
+    generate
+        for ( n = 0; n < 8; n = n + 1 ) begin : fifo_slots
+            always @ ( posedge clk ) begin
+                if ( rst ) begin
+                    bgr_fifo[n] <= 0;
+                    obj_fifo[n] <= 0;
+                end
+                else
+                if ( en && LCD_EN ) begin
+                    // bgr fifo
+                    if ( bgr_fifo_flush )
+                        bgr_fifo[n] <= 0;
+                    else 
+                    if ( bgr_fifo_push )
+                        if ( tile_attr[5] == 1 )
+                            bgr_fifo[n] <= {data_high[n], data_low[n], tile_attr[2:0], tile_attr[7]};
+                        else
+                            bgr_fifo[n] <= {data_high[7-n], data_low[7-n], tile_attr[2:0], tile_attr[7]};
+                    else 
+                    if ( bgr_fifo_read )
+                        if ( n < 7 )
+                            bgr_fifo[n] <= bgr_fifo[n+1];
+                    // obj fifo
+                    obj_fifo_merge[n] <= obj_fifo_merge_n[n];
+                    if ( obj_fifo_flush )
+                        obj_fifo[n] <= 0;
+                    else
+                    if ( obj_fifo_push )
+                        if ( obj_attr[5] == 1 )
+                            if ( !DMG_mode )
+                                obj_fifo[n] <= obj_fifo_merge[n] ?
+                                    {obj_addr[7:2], obj_high[n], obj_low[n], obj_attr[2:0], obj_attr[7]} :
+                                    obj_fifo[n];
+                            else
+                                obj_fifo[n] <= obj_fifo_merge[n] ?
+                                    {obj_addr[7:2], obj_high[n], obj_low[n], 2'b0, obj_attr[4], obj_attr[7]} :
+                                    obj_fifo[n];
+                        else
+                            if ( !DMG_mode )
+                                obj_fifo[n] <= obj_fifo_merge[7-n] ?
+                                    {obj_addr[7:2], obj_high[7-n], obj_low[7-n], obj_attr[2:0], obj_attr[7]} :
+                                    obj_fifo[n];
+                            else
+                                obj_fifo[n] <= obj_fifo_merge[7-n] ?
+                                    {obj_addr[7:2], obj_high[7-n], obj_low[7-n], 2'b0, obj_attr[4], obj_attr[7]} :
+                                    obj_fifo[n];
+                end
+            end
+        end
+    endgenerate
+    always @ ( posedge clk ) begin
+        if ( rst ) begin
+            bgr_fifo_len <= 0;
+            bgr_fifo_flush <= 0;
+            obj_fifo_len <= 0;
+            obj_fifo_flush <= 0;
+        end
+        else
+        if ( en && LCD_EN ) begin
+            bgr_fifo_flush <= bgr_fifo_flush_n;
+            if ( bgr_fifo_flush )
+                bgr_fifo_len <= 0;
+            else 
+            if ( bgr_fifo_push )
+                bgr_fifo_len <= 8;
+            else
+            if ( bgr_fifo_read )
+                bgr_fifo_len <= (bgr_fifo_len == 0) ? 0 : bgr_fifo_len - 1;
+            obj_fifo_flush <= obj_fifo_flush_n;
+            if ( obj_fifo_flush )
+                obj_fifo_len <= 0;
+            else
+            if ( obj_fifo_push )
+                obj_fifo_len <= 8;
+            else
+            if ( obj_fifo_read )
+                obj_fifo_len <= (obj_fifo_len == 0) ? 0 : obj_fifo_len - 1;
+        end
+    end
+
+    initial begin
+        addr_out = 0;
+        data_out = 0;
+        hsync = 1;
+        vsync = 1;
+        {r, g, b} = 0;
+        de = 0;
+        for ( i = 0; i < 'h2000; i = i + 1 ) begin
+            vram_bank_0[i] = 0;
+            vram_bank_1[i] = 0;
+            if ( i < 160 )
+                OAM[i] = 0;
+            if ( i < 64 ) begin
+                BGP_RGB[i] = 0;
+                OBP_RGB[i] = 0;
+            end
+            if ( i < 10 ) begin
+                obj_arr[i][0] = 0;
+                obj_arr[i][1] = 0;
+                obj_arr[i][2] = 0;
+                obj_arr[i][3] = 0;
+                obj_arr[i][4] = 0;
+            end
+            if ( i < 8 ) begin
+                bgr_fifo[i] = 0;
+                obj_fifo[i] = 0;
+                obj_fifo_merge[i] = 0;
+            end
+        end
+    end
+
+    always @ ( posedge clk ) begin 
+        if ( rst ) begin
+            clock_phase <= 0;
+            DMA_state <= 0;
+            DMA_counter <= 0;
+            current_mode <= oamScan;
+            dot_counter <= 0;
+            oamScan_substate <= get_y_position;
+            oam_idx <= 0;
+            for ( i = 0; i < 10; i = i + 1 ) begin
+                obj_arr[i][0] <= 0;
+                obj_arr[i][1] <= 0;
+                obj_arr[i][2] <= 0;
+                obj_arr[i][3] <= 0;
+                obj_arr[i][4] <= 0;
+            end
+            obj_valid <= 0;
+            objs_on_scanline <= 0;
+            current_obj <= 0;
+            fetcher_state <= fetcher_bgr_map_addr;
+            fetcher_return <= fetcher_bgr_map_addr;
+            fetch_counter <= 0;
+            tile_addr <= 0;
+            tile_idx <= 0;
+            tile_attr <= 0;
+            data_low <= 0;
+            data_high <= 0;
+            win_y_cond <= 0;
+            win_x <= 0;
+            win_y <= 0;
+            obj_low <= 0;
+            obj_high <= 0;
+            output_x <= 0;
+            mixed_pixel <= 0;
+            mixed_pixel0 <= 0;
+            rgb_low <= 0;
+            rgb_low0 <= 0;
+            pallet_idx <= 0;
+            rgb_high <= 0;
+            r <= 0;
+            g <= 0;
+            b <= 0;
+            de <= 0;
+            de0 <= 0;
+            de1 <= 0;
+            de2 <= 0;
+            hsync <= 1;
+            vsync <= 1;
+            LY_reg <= 0;
+            LCDC_reg <= 0;
+            STAT_reg[7:3] <= 0;
+            SCY_reg <= 0;
+            SCX_reg <= 0;
+            LYC_reg <= 0;
+            DMA_reg <= 0;
+            BGP_reg <= 0;
+            OBP0_reg <= 0;
+            OBP1_reg <= 0;
+            WX_reg <= 0;
+            WY_reg <= 0;
+            KEY0_reg <= 0;
+            KEY0_locked <= 0;
+            BGPI_reg <= 0;
+            OBPI_reg <= 0;
+            OPRI_reg <= 0;
+        end
+        else
+        if ( en ) begin
+            clock_phase <= clock_phase_n;
+            if ( LCD_EN ) begin
+                DMA_state <= DMA_state_n;
+                DMA_counter <= DMA_counter_n;
+                current_mode <= next_mode;
+                dot_counter <= dot_counter_n;
+                oamScan_substate <= oamScan_substate_n;
+                oam_idx <= oam_idx_n;
+                if ( write_obj_arr ) begin
+                    obj_arr[objs_on_scanline][obj_arr_elem] <= obj_arr_data;
+                    if ( obj_arr_elem == 0 ) // adding new element to object array
+                        obj_arr[objs_on_scanline][4] <= oam_idx / 4; // position in OAM
+                end
+                obj_valid <= obj_valid_n;
+                objs_on_scanline <= objs_on_scanline_n;
+                current_obj <= current_obj_n;
+                fetcher_state <= fetcher_state_n;
+                fetcher_return <= fetcher_return_n;
+                fetch_counter <= fetch_counter_n;
+                tile_addr <= tile_addr_n;
+                tile_idx <= tile_idx_n;
+                tile_attr <= tile_attr_n;
+                data_low <= data_low_n;
+                data_high <= data_high_n;
+                win_y_cond <= win_y_cond_n;
+                win_x <= win_x_n;
+                win_y <= win_y_n;
+            
+                obj_low <= obj_low_n;
+                obj_high <= obj_high_n;
+
+                output_x <= output_x_n;
+
+                mixed_pixel <= mixed_pixel_n;
+                mixed_pixel0 <= mixed_pixel0_n;
+                rgb_low <= rgb_low_n;
+                rgb_low0 <= rgb_low0_n;
+                pallet_idx <= pallet_idx_n;
+                rgb_high <= rgb_high_n;
+                r <= r_n;
+                g <= g_n;
+                b <= b_n;
+                de <= de0;
+                de0 <= de1;
+                de1 <= de2;
+                de2 <= de2_n;
+                hsync <= hsync_n;
+                vsync <= vsync_n;
+
+                if ( inc_LY ) 
+                    LY_reg <= (LY_reg == 153) ? 0 : LY_reg + 1;
+            end
+            if ( oam_we )
+                OAM[oam_addr] <= oam_din;
+            if ( vram0_we )
+                vram_bank_0[vram_addr] <= vram_din;
+            if ( vram1_we )
+                vram_bank_1[vram_addr] <= vram_din;
+            if ( wen ) begin // memory write logic
+                case ( addr_in )
+                    LCDC:   LCDC_reg <=         data_in;
+                    STAT:   STAT_reg[7:3] <=    data_in[7:3];
+                    SCY:    SCY_reg <=          data_in;
+                    SCX:    SCX_reg <=          data_in;
+                    // LY is R/O
+                    LYC:    LYC_reg <=          data_in;
+                    DMA:    DMA_reg <=          data_in < 8'hDF ? data_in : DMA_reg;
+                    BGP:    BGP_reg <=          data_in;
+                    OBP0:   OBP0_reg <=         data_in;
+                    OBP1:   OBP1_reg <=         data_in;
+                    WX:     WX_reg <=           data_in;
+                    WY:     WY_reg <=           data_in;
+                    KEY0: KEY0_reg <= (KEY0_locked) ?
+                                    KEY0_reg :  data_in;
+                    VBK:    VBK_reg[0] <=       data_in[0];
+                    BANK:   KEY0_locked <= 1;
+                    BGPI:   BGPI_reg <=         data_in;
+                    BGPD: begin
+                        if ( current_mode != drawing )
+                            BGP_RGB[BGP_ADDR] <= data_in;
+                        if ( BGP_AUTO_INC )
+                            BGPI_reg[5:0] <= BGPI_reg[5:0] + 1;
+                    end
+                    OBPI:   OBPI_reg <=         data_in;
+                    OBPD: begin
+                        if ( current_mode != drawing )
+                            OBP_RGB[OBP_ADDR] <= data_in;
+                        if ( OBP_AUTO_INC )
+                            OBPI_reg[5:0] <= OBPI_reg[5:0] + 1;
+                    end
+                    OPRI:   OPRI_reg <=         data_in;
+                    default: begin
+                        // This case block is only for control/status registers
+                    end
+                endcase
+            end
+        end
+    end
+
+    always @* begin
+        // defaults (if needed)
+        clock_phase_n                   = clock_phase;
+        oam_din                         = data_in;
+        vram_din                        = data_in;
+        
+        oam_we                          = 0;
+        vram0_we                        = 0;
+        vram1_we                        = 0;
+
+        DMA_state_n                     = DMA_state;
+        DMA_counter_n                   = DMA_counter;
+        rout                            = 0;
+        wout                            = 0;
+        addr_out                        = 0;
+
+        dot_counter_n                   = dot_counter + 1;
+        next_mode                       = current_mode;
+        oamScan_substate_n              = oamScan_substate;
+        oam_idx_n                       = oam_idx;
+        oam_addr                        = addr_in[7:0];
+        vram_addr                       = addr_in[12:0];
+        obj_is_on_line                  = 0;
+        objs_on_scanline_n              = objs_on_scanline;
+        write_obj_arr                   = 0;
+        obj_arr_elem                    = 0;
+        obj_arr_data                    = 0;
+        fetcher_state_n                 = fetcher_state;
+        fetcher_return_n                = fetcher_return;
+        fetch_counter_n                 = fetch_counter;
+        tile_addr_n                     = tile_addr;
+        tile_idx_n                      = tile_idx;
+        tile_attr_n                     = tile_attr;
+        data_low_n                      = data_low;
+        data_high_n                     = data_high;
+        pix_x                           = 0;
+        pix_y                           = 0;
+        map_base                        = 0;
+        win_y_cond_n                    = win_y_cond;
+        win_x_n                         = win_x;
+        win_y_n                         = win_y;
+
+
+        obj_valid_n                     = obj_valid;
+        current_obj_n                   = current_obj;
+        obj_low_n                       = obj_low;
+        obj_high_n                      = obj_high;
+
+        output_x_n                      = output_x;
+        halt_output                     = 0;
+
+        mixed_pixel_n                   = mixed_pixel;
+        mixed_pixel0_n                  = mixed_pixel0;
+        rgb_low_n                       = rgb_low;
+        rgb_low0_n                      = rgb_low0;
+        pallet_idx_n                    = pallet_idx;
+        rgb_high_n                      = rgb_high;
+
+        bgr_fifo_flush_n                = 0;
+        bgr_fifo_push                   = 0;
+        bgr_fifo_read                   = 0;
+
+        for ( i = 0; i < 8; i = i + 1 )
+            obj_fifo_merge_n[i]         = obj_fifo_merge[i];
+        obj_fifo_flush_n                = 0;
+        obj_fifo_push                   = 0;
+        obj_fifo_read                   = 0;
+
+        r_n                             = 0;
+        g_n                             = 0;
+        b_n                             = 0;
+        de2_n                           = 0;
+        hsync_n                         = 1;
+        vsync_n                         = 1;
+
+        inc_LY                          = 0;
+
+
+        STAT_reg[2] = LY_reg == LYC_reg;
+        if ( !LCD_EN ) begin
+            STAT_reg[1:0] = 0;
+        end
+        else
+            STAT_reg[1:0] = current_mode;
+
+        addr_in_is_oam = addr_in >= 16'hFE00 && addr_in <= 16'hFE9F;
+        addr_in_is_vram = addr_in >= 16'h8000 && addr_in <= 16'h9FFF;
+        // CPU issued writes have lower priority than both ppu and dma. These combinational
+        // values can be later overwritten
+        if ( wen ) begin
+            if ( addr_in == DMA && data_in < 8'hDF ) begin
+                DMA_state_n = 1;
+                DMA_counter_n = 0;
+                clock_phase_n = 0;
+            end
+            if ( addr_in_is_oam )
+                oam_we = 1;
+            if ( addr_in_is_vram )
+                if ( VBK_reg[0] == 0 )
+                    vram0_we = 1;
+                else
+                    vram1_we = 1;
+        end
+
+        
+
+        // if output_x == WX_reg, then the NEXT pixel is part of the window
+        // for example, output_x == 8 corresponds to pixel 0, output_x triggers one cycle before
+        win_trigger = (output_x == WX_reg) && ((LY_reg == WY_reg) || win_y_cond) && WIN_EN;
+        obj_trigger = obj_priority_valid;
+        obj_height = (OBJ_SIZE == 0) ? 8 : 16;
+        for ( i = 0; i < 10; i = i + 1 )
+            if ( obj_arr[i][1] == output_x )
+                obj_x_hit[i] = 1;
+            else
+                obj_x_hit[i] = 0;
+
+        
+        data_base = (TILE_SEL == 0) ? 13'h1000 : 13'h0000;
+        tile_base = (TILE_SEL == 0) ? data_base + tile_offset : data_base + tile_idx;
+        if ( bgr_state ) begin
+            map_base = (BG_MAP == 0) ? 13'h1800 : 13'h1C00;
+            pix_x = fetch_counter + SCX_reg;
+            pix_y = LY_reg + SCY_reg;
+        end
+        else 
+        if ( win_state ) begin
+            // increment window x counter when window is active
+            win_x_n = win_x + 1;
+            map_base = (WIN_MAP == 0) ? 13'h1800 : 13'h1C00;
+            pix_x = win_x;
+            pix_y = win_y;
+        end
+
+        tile_x = pix_x / 8;
+        tile_y = pix_y / 8;
+
+        if ( !DMG_mode && (tile_attr[6] == 1) ) begin
+            row_offset = (7 - (pix_y % 8)) * 2;
+        end
+        else begin
+            row_offset = (pix_y % 8) * 2;
+        end
+
+        case ( current_mode )
+            oamScan: begin
+                // Lock oam
+                oam_we = 0;
+                oam_addr = oam_idx;
+                obj_is_on_line = (LY_reg + 16 >= oam_dout) && (LY_reg + 16 < oam_dout + obj_height);
+
+                case ( oamScan_substate ) 
+                    get_y_position: begin
+                        if ( obj_is_on_line ) begin
+                            oamScan_substate_n = get_x_position;
+                            oam_idx_n = oam_idx + 1;
+                            write_obj_arr = 1;
+                            obj_arr_elem = 0;
+                            obj_arr_data = oam_dout - (LY_reg + 16);
+                            obj_valid_n[objs_on_scanline] = 1;
+                        end
+                        else 
+                        if ( oam_idx < 156 ) begin // if this is not last entry in OAM
+                            oam_idx_n = oam_idx + 4;
+                            oamScan_substate_n = get_y_position; // remain on this state
+                        end
+                        else
+                            oamScan_substate_n = await_mode_3;
+                    end
+                    get_x_position: begin
+                        write_obj_arr = 1;
+                        obj_arr_elem = 1;
+                        obj_arr_data = oam_dout;
+                        oamScan_substate_n = get_obj_tile;
+                        oam_idx_n = oam_idx + 1;
+                    end
+                    get_obj_tile: begin
+                        write_obj_arr = 1;
+                        obj_arr_elem = 2;
+                        // If double height object, ignore LSB
+                        obj_arr_data = (OBJ_SIZE == 0) ? oam_dout : oam_dout & 8'hFE;
+                        oamScan_substate_n = get_obj_attr;
+                        oam_idx_n = oam_idx + 1;
+                    end
+                    get_obj_attr: begin
+                        oamScan_substate_n = ( oam_idx < 156 && objs_on_scanline < 9 ) ? // objs_on_scanline == 9, means this is 10th obj
+                            get_y_position : await_mode_3;
+                        write_obj_arr = 1;
+                        objs_on_scanline_n = objs_on_scanline + 1;
+                        obj_arr_elem = 3;
+                        obj_arr_data = oam_dout;
+                        oam_idx_n = oam_idx + 1;
+                    end
+                    await_mode_3: begin
+                        if ( dot_counter == 79 ) begin // 80th dot
+                            next_mode = drawing;
+
+                            fetch_counter_n = 0;
+
+                            win_x_n = 0;
+
+                            fetcher_state_n = fetcher_bgr_map_addr;
+                            bgr_fifo_flush_n = 1;
+                            obj_fifo_flush_n = 1;
+                        end
+                    end
+                    default:; // all cases of one-hot state machine captured
+                endcase
+            end
+            drawing: begin // Mode 3
+                // Lock oam and vram
+                oam_we = 0;
+                vram0_we = 0;
+                vram1_we = 0;
+                vram_addr = tile_addr;
+                case ( fetcher_state )
+                    fetcher_bgr_map_addr,
+                    fetcher_win_map_addr: begin 
+                        tile_addr_n = map_base + (tile_y * 32) + tile_x;
+                        fetcher_state_n = (bgr_state) ? fetcher_bgr_read_map : fetcher_win_read_map;
+                    end
+                    fetcher_bgr_read_map,
+                    fetcher_win_read_map: begin
+                        tile_idx_n = vram0_dout;
+                        tile_attr_n = vram1_dout;
+                        fetcher_state_n = (bgr_state) ? fetcher_bgr_data_addr : fetcher_win_data_addr;
+                    end
+                    fetcher_bgr_data_addr,
+                    fetcher_win_data_addr: begin
+                        tile_addr_n = tile_base + row_offset;
+                        fetcher_state_n = (bgr_state) ? fetcher_bgr_low_data : fetcher_win_low_data;
+                    end
+                    fetcher_bgr_low_data,
+                    fetcher_win_low_data: begin
+                        data_low_n = (tile_attr[3] == 0) ? vram0_dout : vram1_dout;
+                        tile_addr_n = tile_addr + 1;
+                        fetcher_state_n = (bgr_state) ? fetcher_bgr_high_data : fetcher_win_high_data;
+                    end
+                    fetcher_bgr_high_data,
+                    fetcher_win_high_data: begin
+                        data_high_n = (tile_attr[3] == 0) ? vram0_dout : vram1_dout;
+                        fetcher_state_n = (bgr_state) ? fetcher_bgr_push_fifo : fetcher_win_push_fifo;
+                    end
+                    fetcher_bgr_push_fifo,
+                    fetcher_win_push_fifo: begin
+                        if ( bgr_fifo_len == 0 || (bgr_fifo_len == 1 && bgr_fifo_read) ) begin
+                            bgr_fifo_push = 1;
+                            
+                            fetcher_state_n = (bgr_state) ? fetcher_bgr_map_addr : fetcher_win_map_addr;
+                            if ( bgr_state )
+                                fetch_counter_n = fetch_counter + 8;
+                            else if ( win_state )
+                                win_x_n = win_x + 8;
+                            fetch_counter_n = fetch_counter + 1;
+                        end
+                        if ( obj_trigger ) begin // there is valid object to be fetched
+                            if ( OBJ_EN == 1 ) begin
+                                current_obj_n = obj_with_priority;
+                                // return to next state after obj is pushed
+                                fetcher_return_n = fetcher_state_n;
+                                fetcher_state_n = fetcher_obj_data_addr;
+                            end
+                            else// discard obj if obj rendering disabled
+                                obj_valid_n[obj_with_priority] = 0;
+                        end
+                    end
+                    fetcher_obj_wait: begin
+                        fetcher_state_n = fetcher_obj_data_addr;
+                    end
+                    fetcher_obj_data_addr: begin
+                        tile_addr_n = (obj_attr[6] == 0) ? 
+                            obj_tile + (obj_y * 2) :
+                            obj_tile + ((obj_height - 1 - obj_y) * 2);
+                        fetcher_state_n = fetcher_obj_low_data;
+                    end
+                    fetcher_obj_low_data: begin
+                        obj_low_n = (obj_attr[3] == 0) ? vram0_dout : vram1_dout;
+                        tile_addr_n = tile_addr + 1;
+                        fetcher_state_n = fetcher_obj_high_data;
+                    end
+                    fetcher_obj_high_data: begin
+                        obj_high_n = (obj_attr[3] == 0) ? vram0_dout : vram1_dout;
+                        fetcher_state_n = fetcher_obj_merge_fifo;
+                    end
+                    fetcher_obj_merge_fifo: begin
+                        obj_valid_n[current_obj] = 0;
+                        for ( i = 0; i < 8; i = i + 1 ) begin
+                            if ( obj_attr[5] == 1 ) begin
+                                if ( !DMG_mode ) begin
+                                    // transparent pixel OR new object has lower oam idx
+                                    obj_fifo_merge_n[i] = (obj_fifo[i][5:4] == 2'b0 || obj_addr < obj_fifo[i][11:6]) ? 
+                                        1 : 0;
+                                end
+                                else begin
+                                    obj_fifo_merge_n[i] = (obj_fifo[i][5:4] == 2'b0) ? 1 : 0;
+                                end
+                            end
+                            else begin
+                                if ( !DMG_mode ) begin
+                                    // transparent pixel OR new object has lower oam idx
+                                    obj_fifo_merge_n[7-i] = (obj_fifo[7-i][5:4] == 2'b0 || obj_addr < obj_fifo[7-i][11:6]) ? 
+                                        1 : 0;
+                                end
+                                else begin
+                                    obj_fifo_merge_n[7-i] = (obj_fifo[7-i][5:4] == 2'b0) ? 1 : 0;
+                                end
+                            end
+                        end
+                        fetcher_state_n = fetcher_obj_push_fifo;
+                    end
+                    fetcher_obj_push_fifo: begin
+                        obj_fifo_push = 1;
+                        if ( obj_trigger ) begin
+                            current_obj_n = obj_with_priority;
+                            fetcher_state_n = fetcher_obj_wait;
+                        end
+                        else
+                            fetcher_state_n = fetcher_return;
+                    end
+                default:; // One hot coded
+                endcase
+                if ( win_trigger && !obj_trigger && !obj_state ) begin 
+                    // only time fifo flush is high, state is win_map_addr, so fifo can never be flushed and pushed
+                    // to in same cycle
+                    // if obj_trigger || obj_state is true, the output will stop incrementing output_x
+                    // in order to ensure fetcher is not stuck due to win_trigger being held high in this case,
+                    // the win_trigger must let the obj state complete. On completion of one object fetch cycle,
+                    // output_x will remain on the same value for at least one cycle (output needs to read the fifo
+                    // in order to increment), !obj_trigger && !obj_state if all of the object have been fetched, or if
+                    // the next object is not on this x. At this point, win_trigger_will finally allow the bgr fifo
+                    // to be flushed on the next cycle.
+                    // in other words, the condition (win_trigger && !obj_trigger && !obj_state) can only be high for one cycle for any
+                    // given output_x
+                    bgr_fifo_flush_n = 1;
+                    fetcher_state_n = fetcher_win_data_addr;
+                    if ( !win_y_cond ) begin
+                        // first time this frame the window was triggered
+                        win_y_n = 0;
+                        win_y_cond_n = 1;
+                    end
+                    else begin
+                        win_y_n = win_y + 1;
+                    end
+                end
+
+                // output stage
+                // Increment output_x during initial fetch
+                if ( !obj_trigger && !obj_state && output_x < 8 )
+                    output_x_n = output_x + 1;
+                else
+                if ( !(obj_trigger || obj_state || bgr_fifo_flush == 1 || bgr_fifo_len == 0) ) begin 
+                    // any of these conditions stalls the output
+                    // obj_with_priority may get set to 4'hF while data is yet to be pushed to obj_fifo
+                    de2_n = output_x < 168 ? 1 : 0;
+                    output_x_n = output_x + 1;
+                    bgr_fifo_read = 1;
+                    if ( OBJ_PRI_MODE == 1 ) begin // DMG mode
+                    // Stage 0
+                        if ( obj_fifo_len > 0 ) begin
+                            obj_fifo_read = 1;
+                            if ( BG_EN == 1 ) begin
+                                if ( obj_pix_idx == 0 || obj_pix_pri == 1 )
+                                    mixed_pixel_n = {bgr_pix_idx, 3'b000, 1'b0}; // bgr_pix_pal == 3'd0 means non-blank pixel
+                                else
+                                    mixed_pixel_n = {obj_pix_idx, obj_pix_pal, 1'b1};
+                            end
+                            else begin
+                                if ( obj_pix_idx == 0 )
+                                    mixed_pixel_n = {bgr_pix_idx, 3'b001, 1'b0}; // blank pixel symbolized by bgr_pix_pal 3'd1
+                                else
+                                    mixed_pixel_n = {obj_pix_idx, obj_pix_pal, 1'b1};
+                            end
+                        end
+                        else begin
+                            mixed_pixel_n = {bgr_pix_idx, 3'b000, 1'b0};
+                        end
+                    // Stage 1
+                        if ( mixed_pixel[0] == 0 ) begin // background/window
+                            if ( mixed_pixel[1] == 1 ) begin // blank pixel
+                                pallet_idx_n = 4'd8;
+                            end
+                            else begin
+                                pallet_idx_n = {1'b0, BGP_reg[((mixed_pixel[5:4])*2)+1-:1], 1'b0}; // BGP ID * 2
+                            end
+                        end
+                        else begin
+                            if ( mixed_pixel[1] == 1 ) begin
+                                pallet_idx_n = {1'b0, OBP1_reg[((mixed_pixel[5:4])*2)+1-:1], 1'b0};
+                            end
+                            else begin
+                                pallet_idx_n = {1'b0, OBP0_reg[((mixed_pixel[5:4])*2)+1-:1], 1'b0};
+                            end
+                        end
+                    // Stage 2
+                        rgb_low_n = DMG_RGB[pallet_idx];
+                        rgb_high_n = DMG_RGB[pallet_idx+1];
+                    end
+                    else begin // CGB_mode
+                    // Stage 0
+                        if ( obj_fifo_len > 0 ) begin
+                            obj_fifo_read = 1;
+                            if ( BG_EN == 1 ) begin
+                                if ( obj_pix_idx == 0 || (((obj_pix_pri | bgr_pix_pri) == 1) && (bgr_pix_idx != 0)) )
+                                    mixed_pixel0_n = {bgr_pix_idx, bgr_pix_pal, 1'b0};
+                                else
+                                    mixed_pixel0_n = {obj_pix_idx, obj_pix_pal, 1'b1};
+                            end
+                            else begin
+                                if ( obj_pix_idx == 0 )
+                                    mixed_pixel0_n = {bgr_pix_idx, bgr_pix_pal, 1'b0};
+                                else
+                                    mixed_pixel0_n = {obj_pix_idx, obj_pix_pal, 1'b1};
+                            end
+                        end else begin
+                            mixed_pixel0_n = {bgr_pix_idx, bgr_pix_pal, 1'b0};
+                        end
+                    // Stage 1
+                        mixed_pixel_n = mixed_pixel0;
+                        if ( mixed_pixel0[0] == 0 )
+                            rgb_low0_n = BGP_RGB[{mixed_pixel0[3:1], mixed_pixel0[5:4], 1'b0}];
+                        else
+                            rgb_low0_n = OBP_RGB[{mixed_pixel0[3:1], mixed_pixel0[5:4], 1'b0}];
+                    // Stage 2
+                        rgb_low_n = rgb_low0;
+                        if ( mixed_pixel[0] == 0 )
+                            rgb_high_n = BGP_RGB[{mixed_pixel[3:1], mixed_pixel[5:4], 1'b1}];
+                        else
+                            rgb_high_n = OBP_RGB[{mixed_pixel[3:1], mixed_pixel[5:4], 1'b1}];
+                    end
+                    // Stage 3
+                    r_n = rgb_low[4:0];
+                    g_n = {rgb_high[1:0], rgb_low[7:5]};
+                    b_n = rgb_high[6:2];
+                end
+                if ( output_x >= 168 && !(de0 | de1 | de2) ) begin
+                    // Wait for output pipeline to empty
+                    next_mode = h_blank;
+                end
+            end
+            h_blank: begin
+                if ( dot_counter >= (456 - 80) ) // hsync high for last 80 dots of hblank
+                    hsync_n = 1;
+                if ( dot_counter == 455 ) begin
+                    dot_counter_n = 0;
+                    oam_idx_n = 0;
+                    oamScan_substate_n = get_y_position;
+                    obj_valid_n = 0;
+                    
+                    if ( LY_reg == 143 )
+                        next_mode = v_blank;
+                    else
+                        next_mode = oamScan;
+                end
+            end
+            v_blank: begin
+                if ( LY_reg >= (153 - 8) ) // vsync high for last 8 scanlines
+                    vsync_n = 1;
+                if ( dot_counter == 455 ) begin
+                    dot_counter_n = 0;
+                    inc_LY = 1;
+                    if ( LY_reg == 153 ) begin
+                        win_y_cond_n = 0;
+                        next_mode = oamScan;
+                    end
+                end
+            end
+            default:; // All cases captured
+        endcase
+        // DMA has highest priority over mem
+        if ( DMA_state ) begin
+            case ( clock_phase )
+                'b00: begin
+                    clock_phase_n = 'b01;
+                    oam_addr = DMA_counter;
+                    addr_out = {DMA_reg, DMA_counter};
+                    rout = 1;
+                    oam_din = data_in;
+                    oam_we = 1;
+                    // DMA operates on same clock as CPU
+                    if ( DMA_counter == 159 ) begin
+                        DMA_state_n = 0;
+                        DMA_counter_n = 0;
+                    end
+                    else begin
+                        DMA_counter_n = DMA_counter + 1;
+                    end
+                end
+                'b01: begin
+                    if ( dbl_spd )
+                        clock_phase_n = 'b00;
+                    else
+                        clock_phase_n = 'b10;
+                end
+                'b10: begin
+                    clock_phase_n = 'b11;
+                end
+                'b11: begin
+                    clock_phase_n = 'b00;
+                end
+                default:; // All cases captured
+            endcase
+        end
+        
+        if ( ren ) begin
+            case ( addr_in )
+                LCDC:   data_out = LCDC_reg;
+                STAT:   data_out = STAT_reg;
+                SCY:    data_out = SCY_reg;
+                SCX:    data_out = SCX_reg;
+                LY:     data_out = LY_reg;
+                LYC:    data_out = LYC_reg;
+                DMA:    data_out = DMA_reg;
+                BGP:    data_out = BGP_reg;
+                OBP0:   data_out = OBP0_reg;
+                OBP1:   data_out = OBP1_reg;
+                WX:     data_out = WX_reg;
+                WY:     data_out = WY_reg;
+                KEY0:   data_out = KEY0_reg;
+                VBK:    data_out = VBK_reg;
+                BGPI:   data_out = BGPI_reg;
+                BGPD: begin
+                    if ( current_mode == drawing )
+                        data_out = 8'hFF;
+                    else
+                        data_out = BGP_RGB[BGPI_reg[5:0]];
+                end
+                OBPI:   data_out = OBPI_reg;
+                OBPD: begin
+                    if ( current_mode == drawing )
+                        data_out = 8'hFF;
+                    else
+                        data_out = OBP_RGB[OBPI_reg[5:0]];
+                end
+                OPRI:   data_out = OPRI_reg;
+                default: begin
+                    if ( addr_in >= 16'h8000 && addr_in <= 16'h9FFF ) // VRAM address range 
+                        if ( VBK_reg[0] == 1'b0 )
+                            data_out = current_mode != drawing ? vram0_dout : 8'hFF;
+                        if ( VBK_reg[0] == 1'b1 )
+                            data_out = current_mode != drawing ? vram1_dout : 8'hFF;
+                    else
+                    if ( addr_in >= 16'hFE00 && addr_in <= 16'hFE9F ) // OAM address range
+                        data_out = (current_mode != drawing && current_mode != oamScan) ? 
+                            OAM[oam_addr] : 8'hFF;
+                    else
+                        data_out = 8'h00;
+                end
+            endcase
+        end
+        else            data_out = 8'h00;
+
+        
+
+    end
+
 endmodule
+

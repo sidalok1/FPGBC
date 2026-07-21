@@ -1,6 +1,6 @@
-
+`default_nettype none
 module ControlUnit(
-        clk,
+        clk, rst, en,
         IE, IF,
         ack_IF,
         data,
@@ -15,7 +15,9 @@ module ControlUnit(
         write,
         alu_op, flag_mask, idu_op,
         cc, cc_true,
-        intr_req
+        wake,
+        stop,
+        halt
 );
     
     `include "RegFile_params.vh"
@@ -24,7 +26,10 @@ module ControlUnit(
     `include "ALU_params.vh"
 
     input wire          clk;
-    input wire          intr_req;
+    input wire          en;
+    input wire          rst;
+    input wire          wake;
+    output reg          stop = 0, halt = 0;
     input wire  [7:0]   data, IE, IF;
     output reg          write = 0;
     output wire         read;
@@ -45,10 +50,27 @@ module ControlUnit(
     assign read = fetch | read_from_mem;
     
     reg [4:0] state = S0, next = S0;
-    reg prefix = 0, prefix_next = 0;
+    reg [4:0] intr_state = S0, intr_state_n, intr_return_state = S0, intr_return_state_n;
+    reg prefix = 0, prefix_next = 0, prefix_return = 0, prefix_return_n;
 
     reg IME;
     reg set_IME = 0, set_IME_next = 0, unset_IME = 0;
+
+    wire [2:0] next_interrupt;
+    wire intr_valid;
+    PriorityEncoder #(
+        .WIDTH(5)
+    ) intr_priority_encoder (
+        .i( IE[4:0] & IF[4:0] ),
+        .o( next_interrupt ),
+        .v( intr_valid )
+    );
+    wire [15:0] interrupt_jump_vector [0:4];
+    assign interrupt_jump_vector[0] = 16'h40; // VBlank interrupt
+    assign interrupt_jump_vector[1] = 16'h48; // STAT interrupt
+    assign interrupt_jump_vector[2] = 16'h50; // Timer interrupt
+    assign interrupt_jump_vector[3] = 16'h58; // Serial interrupt
+    assign interrupt_jump_vector[4] = 16'h60; // Joypad interrupt
 
     wire [IDU_OPWIDTH:0] r16mem_op [0:3];
     assign r16mem_op[0] = ZER; // [bc]
@@ -92,31 +114,48 @@ module ControlUnit(
     assign LSBs[SP] = F;
 
 
-    wire halt;
-    assign halt = IR[5:0] == 6'b110_110;
+    wire halt_condition;
+    assign halt_condition = IR[5:0] == 6'b110_110;
 
     always @ ( posedge clk ) begin
-        state <= next;
-        if ( fetch ) begin
-            IR <= data;
-        end
-        if ( set_IME ) begin
-            set_IME_next <= 1;
-        end else begin
-            set_IME_next <= 0;
-        end
-        if ( unset_IME ) begin
+        if ( rst ) begin
+            state <= S0;
+            intr_state <= S0;
+            intr_return_state <= 0;
+            IR <= 0;
+            set_IME <= 0;
             IME <= 0;
-        end else if ( set_IME_next ) begin
-            IME <= 1;
-        end else begin
-            IME <= IME;
+            prefix <= 0;
+            prefix_return <= 0;
         end
-        prefix <= prefix_next;
+        else if ( en | wake ) begin
+            state <= next;
+            intr_state <= intr_state_n;
+            intr_return_state <= intr_return_state_n;
+            if ( fetch ) begin
+                IR <= data;
+            end
+            if ( set_IME ) begin
+                set_IME_next <= 1;
+            end else begin
+                set_IME_next <= 0;
+            end
+            if ( unset_IME ) begin
+                IME <= 0;
+            end else if ( set_IME_next ) begin
+                IME <= 1;
+            end else begin
+                IME <= IME;
+            end
+            prefix <= prefix_next;
+            prefix_return <= prefix_return_n;
+        end
     end
 
     always @* begin
         next = S0;
+        intr_state_n = S0;
+        intr_return_state_n = intr_return_state;
         fetch = 0;
         write = 0;
         read_from_mem = 0;
@@ -135,11 +174,61 @@ module ControlUnit(
         set_IME = 0;
         unset_IME = 0;
         prefix_next = 0;
+        prefix_return_n = prefix_return;
+        ack_IF = 0;
+        stop = 0;
+        halt = 0;
 
         
 
         // begin state logic
-        if ( prefix ) begin 
+        if ( IME && intr_valid ) begin
+            case ( intr_state ) 
+            S0: begin
+                // save current state, to return to on reti
+                intr_return_state_n = state;
+                prefix_return_n = prefix;
+                addrh = SPH;
+                addrl = SPL;
+                idu_op = DEC;
+                rd_idu = SP;
+                intr_state_n = S1;
+            end
+            S1: begin
+                addrh = SPH;
+                addrl = SPL;
+                r1 = PCH;
+                write = 1;
+                idu_op = DEC;
+                rd_idu = SP;
+                intr_state_n = S2;
+            end
+            S2: begin
+                addrh = SPH;
+                addrl = SPL;
+                r1 = PCL;
+                write = 1;
+                intr_state_n = S3;
+            end
+            S3: begin
+                ctr = interrupt_jump_vector[next_interrupt][7:0];
+                rd = PCL;
+                intr_state_n = S4;
+            end
+            S4: begin
+                ctr = interrupt_jump_vector[next_interrupt][15:8];
+                rd = PCH;
+                intr_state_n = S5;
+            end
+            S5: begin
+                rd_idu = PC;
+                ack_IF[next_interrupt] = 1;
+                unset_IME = 1;
+                fetch = 1;
+            end
+            endcase
+        end
+        else if ( prefix ) begin 
             // prefixed arithmetic
             prefix_next = 1;
             case ( state )
@@ -181,14 +270,14 @@ module ControlUnit(
             end
             endcase
         end
-        else casex ( IR )
+        else casez ( IR )
         'b00_000_000: begin
             $display("nop");
             // nop
             rd_idu = PC;
             fetch = 1;
         end
-        'b00_xx0_001: begin
+        'b00_??0_001: begin
             // ld r16, imm16
             `executing("ld r16, imm16")
             case ( state )
@@ -212,7 +301,7 @@ module ControlUnit(
             end
             endcase
         end
-        'b00_xx0_010: begin
+        'b00_??0_010: begin
             `executing("ld [r16mem], a")
             case ( state )
             S0: begin
@@ -231,7 +320,7 @@ module ControlUnit(
             end
             endcase
         end
-        'b00_xx0_011: begin
+        'b00_??0_011: begin
             $display("inc r16");
             case ( state )
             S0: begin
@@ -246,7 +335,7 @@ module ControlUnit(
             end
             endcase
         end
-        'b00_xxx_100: begin
+        'b00_???_100: begin
             $display("inc r8");
             case ( state )
             S0: begin
@@ -285,7 +374,7 @@ module ControlUnit(
             end
             endcase
         end
-        'b00_xxx_101: begin
+        'b00_???_101: begin
             $display("dec r8");
             case ( state )
             S0: begin
@@ -324,7 +413,7 @@ module ControlUnit(
             end
             endcase
         end
-        'b00_xxx_110: begin
+        'b00_???_110: begin
             $display("ld r8, imm8");
             case ( state )
             S0: begin
@@ -352,14 +441,14 @@ module ControlUnit(
             end
             endcase
         end
-        'b00_xxx_111: begin
+        'b00_???_111: begin
             r1 = A;
             data_sel = ALU;
             rd_idu = PC;
             fetch = 1;
             flag_mask = ALLFLAG;
-            casex ( IR[5:3] )
-            'b0xx: begin
+            casez ( IR[5:3] )
+            'b0??: begin
                 rd = A;
                 r2 = CTR;
                 ctr =  {4'b0, 
@@ -421,7 +510,7 @@ module ControlUnit(
             end
             endcase
         end
-        'b00_xx1_001: begin
+        'b00_??1_001: begin
             `executing("add hl, r16")
             data_sel = ALU;
             flag_mask = NFLAG | HFLAG | CFLAG ;
@@ -446,7 +535,7 @@ module ControlUnit(
             end
             endcase
         end
-        'b00_xx1_010: begin
+        'b00_??1_010: begin
             $display("ld a, [r16mem]");
             case ( state )
             S0: begin
@@ -465,7 +554,7 @@ module ControlUnit(
             end
             endcase
         end
-        'b00_xx1_011: begin
+        'b00_??1_011: begin
             $display("dec r16");
             case ( state )
             S0: begin
@@ -486,12 +575,13 @@ module ControlUnit(
             // temporary (possibly incorrect) implementation of stop
             case ( state )
                 S0: begin
-                    if ( IE & IF ) begin
-                        rd_idu = PC;
-                        fetch = 1;
-                    end 
+                    stop = 1;
+                    // if ( IE & IF ) begin
+                    //     rd_idu = PC;
+                    //     fetch = 1;
+                    // end 
                 end
-                S1: $finish();
+                // S1: $finish();
             endcase
         end
         'b00_011_000: begin
@@ -524,7 +614,7 @@ module ControlUnit(
             end
             endcase
         end
-        'b00_1xx_000: begin
+        'b00_1??_000: begin
             `executing("jr cond, imm8")
             case ( state )
             S0: begin
@@ -563,10 +653,10 @@ module ControlUnit(
             end
             endcase
         end
-        'b01_xxx_xxx: begin
+        'b01_???_???: begin
             case ( state )
             S0: begin
-                if ( halt ) begin
+                if ( halt_condition ) begin
                     next = S1;
                     idu_op = DEC;
                     rd_idu = PC;
@@ -595,12 +685,15 @@ module ControlUnit(
                 end
             end
             S1: begin
+                // Nintendo says that awaking from an interrupt can still happen
+                // with IME = 0, just moves on to next instruction
                 fetch = 1;
-                next = S1;
-                if ( IE & IF ) begin
-                    next = S0;
-                    rd_idu = PC;
-                end
+                halt = 1;
+                // next = S1;
+                // if ( IE & IF ) begin
+                //     next = S0;
+                //     rd_idu = PC;
+                // end
             end
             S2: begin
                 fetch = 1;
@@ -608,7 +701,7 @@ module ControlUnit(
             end
             endcase
         end
-        'b10_xxx_xxx: begin
+        'b10_???_???: begin
             case ( state )
             S0: begin
                 if ( IR[2:0] == 'b110 ) begin
@@ -649,7 +742,7 @@ module ControlUnit(
             end
             endcase
         end
-        'b11_0xx_000: begin
+        'b11_0??_000: begin
             `executing("ret cc")
             case ( state )
             S0: begin
@@ -691,7 +784,7 @@ module ControlUnit(
             end
             endcase
         end
-        'b11_0x1_001: begin
+        'b11_0?1_001: begin
             if ( IR[4] )    `executing("reti")
             else            `executing("ret")
             case ( state )
@@ -722,12 +815,20 @@ module ControlUnit(
                 next = S3;
             end
             S3: begin
+                if ( IR[4] ) begin // if returning from interrupt, go to previous state
+                    next = intr_return_state;
+                    prefix_next = prefix_return;
+                end 
+                else begin
+                    next = S0;
+                    prefix_next = 0;
+                end
                 rd_idu = PC;
                 fetch = 1;
             end
             endcase
         end
-        'b11_xx0_001: begin
+        'b11_??0_001: begin
             `executing("pop r16stk")
             case ( state )
             S0: begin
@@ -765,7 +866,7 @@ module ControlUnit(
             end
             endcase
         end
-        'b11_0xx_010: begin
+        'b11_0??_010: begin
             `executing("jp cond, imm16")
             case ( state )
             S0: begin
@@ -830,7 +931,7 @@ module ControlUnit(
             end
             endcase
         end
-        'b11_0xx_100: begin
+        'b11_0??_100: begin
             `executing("call cond, imm16")
             case ( state )
             S0: begin
@@ -934,7 +1035,7 @@ module ControlUnit(
             end
             endcase
         end
-        'b11_xx0_101: begin
+        'b11_??0_101: begin
             `executing("push r16stk")
             case ( state )
             S0: begin
@@ -966,7 +1067,7 @@ module ControlUnit(
             end
             endcase
         end
-        'b11_xxx_110: begin
+        'b11_???_110: begin
             // A, imm8 arithmetic
             case ( state )
             S0: begin
@@ -1234,7 +1335,7 @@ module ControlUnit(
             end
             endcase
         end
-        'b11_xxx_111: begin
+        'b11_???_111: begin
             `executing("rst tgt3")
             case ( state )
             S0: begin
@@ -1282,5 +1383,6 @@ module ControlUnit(
         endcase
     end
 
+    
 
 endmodule

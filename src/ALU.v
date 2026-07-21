@@ -1,4 +1,4 @@
-
+`default_nettype none
 module ALU ( op, in1, in2, out, flags_in, flags_out );
 
     `include "ALU_params.vh"
@@ -14,10 +14,10 @@ module ALU ( op, in1, in2, out, flags_in, flags_out );
     reg z = 0, n = 0, c = 0, h = 0;
     assign flags_out = {z, n, h, c};
 
-    assign zero = flags_in[3];
-    assign half = flags_in[1];
-    assign carry = flags_in[0];
-    assign subtract = flags_in[2];
+    wire zero = flags_in[3];
+    wire half = flags_in[1];
+    wire carry = flags_in[0];
+    wire subtract = flags_in[2];
 
     wire daa_off_l, daa_off_h;
 
@@ -39,7 +39,7 @@ module ALU ( op, in1, in2, out, flags_in, flags_out );
 
     assign out = full_result[7:0];
 
-    always @( op, in1, in2, carry, offset ) begin
+    always @* begin
         z = zero;
         n = subtract;
         h = half;

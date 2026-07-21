@@ -1,3 +1,4 @@
+`default_nettype none
 module IDU(
     addr_in,
     op, sign, carry,
@@ -12,7 +13,7 @@ module IDU(
     input   wire                        sign, carry;
     output  reg     [15:0]              out;
 
-    always @( addr_in, op, sign, carry ) begin
+    always @* begin
         case ( op )
         ZER: out = addr_in;
         INC: out = addr_in + 1;

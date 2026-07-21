@@ -1,4 +1,4 @@
-TOP=tb_core.v
+TOP=tb.v
 # SAVE=config/reg.sav
 SAVE=config/tb.sav
 VPATH=src:test
