@@ -12,6 +12,8 @@ module Core(
 
     reg [7:0] databus;
 
+    reg [4:0] intr_req_reg;
+
     `include "RegMap.vh"
     `include "Control_params.vh"
     `include "ALU_params.vh"
@@ -122,16 +124,18 @@ module Core(
             IF_reg <= 0;
             KEY1_reg <= 0;
             cpu_phase <= 0;
+            intr_req_reg <= 0;
         end
         else begin
             sig_wake <= sig_wake_n; 
             if ( en ) begin
                 cpu_phase <= cpu_phase_n;
                 KEY1_reg[7] <= speed_n;
+                intr_req_reg <= intr_req;
                 for ( i = 0; i < 5; i = i + 1 ) begin
                     if ( sig_ack_IF[i] )
                         IF_reg[i] <= 0;
-                    if ( intr_req[i] )
+                    if ( intr_req[i] & ~intr_req_reg[i] ) // intr posedge
                         IF_reg[i] <= 1;
                 end
                 if ( sig_writeback ) begin
@@ -155,18 +159,19 @@ module Core(
         sig_wake_n = 0;
         stop = 0;
         we = 0;
-        re = 0;
+        // re = 0;
         dout = 0;
         databus = alu_out;
         last_dot_of_phase = (speed == 0 && cpu_phase == 'd3) || (speed == 1 && cpu_phase == 'd1);
 
-        if ( sig_stop == 1 )
-            if ( armed == 1 )
-                speed_n = ~speed;
-            else
-                stop = 1;
+        // if ( sig_stop == 1 )
+        //     if ( armed == 1 )
+        //         speed_n = ~speed;
+        //     else
+        //         stop = 1;
 
-        cpu_en = en && (cpu_phase == 'd0) && !(stop || sig_halt);
+        // cpu_en = en && (cpu_phase == 'd0) && !(stop || sig_halt);
+        cpu_en = en && (cpu_phase == 'd0);
 
         sig_wake_n = |(intr_req & ~IF_reg[4:0]);
         if ( last_dot_of_phase )
@@ -182,20 +187,35 @@ module Core(
             endcase
         end
         else if ( sig_readmem ) begin
-            re = 0;
+            // re = 0;
             case ( addrbus )
                 IF:     databus = IF_reg;
                 IE:     databus = IE_reg;
                 KEY1:   databus = KEY1_reg;
                 default: begin
-                    if ( addrbus <= 16'hFF80 && addrbus <= 16'hFFFE ) begin
+                    if ( addrbus >= 16'hFF80 && addrbus <= 16'hFFFE ) begin
                         databus = hram[addrbus - 16'hFF80];
                     end
                     databus = din;
-                    re = 1;
+                    // re = 1;
                 end
             endcase
         end
     end
+
+    always @* begin
+        re = 0;
+        if ( sig_readmem && (addrbus < 16'hFF80 || addrbus > 16'hFFFE) )
+            re = 1; 
+    end
+
+    `ifdef DEBUG
+    always @ ( posedge clk ) begin
+        if ( controller.fetch ) begin
+            // $display("addr: %x", addrbus);
+            // $display("IR: %b", controller.IR);
+        end
+    end
+    `endif
 
 endmodule

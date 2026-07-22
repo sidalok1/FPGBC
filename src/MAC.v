@@ -21,18 +21,18 @@ module MAC(
     //  |                                             BANK                                              |
     //  |                                              R/O                                              |
     reg [7:0] BANK_reg = 8'h00; // Written to once by boot rom
-    reg BANK_lock;
+    reg BANK_lock = 0;
 
     //  |                                             SVBK                                              |
     //  |                                              R/W                                              |
     reg [7:0] SVBK_reg = 8'h00;
 
-    reg [7:0] bootrom [0:2047];
-    reg [10:0] bootrom_addr;
+    reg [7:0] bootrom [0:2047 + 'h100];
+    reg [11:0] bootrom_addr;
     wire [7:0] bootrom_data = bootrom[bootrom_addr];
 
 
-    reg [7:0] wram [0:7][0:4096]; // Eight banks of WRAM, selected with SVBK. Bank 0 always accessible
+    reg [7:0] wram [0:7][0:4095]; // Eight banks of WRAM, selected with SVBK. Bank 0 always accessible
     reg [11:0] wram_addr;
     reg [2:0] wram_bank_sel; // value of 0 selects bank 1
     reg wram_we;
@@ -87,8 +87,7 @@ module MAC(
         cpu_din = 8'h00;
         ppu_din = 8'h00;
 
-        cpu_addr_in_bootrom =   (cpu_addr >= 16'h0000 && cpu_addr <= 16'h00FF) || 
-                                (cpu_addr >= 16'h0200 && cpu_addr <= 16'h08FF);
+        cpu_addr_in_bootrom =   (cpu_addr >= 16'h0000 && cpu_addr <= 16'h08FF);
         cpu_addr_in_wram = cpu_addr >= 16'hC000 && cpu_addr <= 16'hCFFF;
         ppu_addr_in_wram = ppu_addr >= 16'hC000 && ppu_addr <= 16'hCFFF;
         cpu_addr_in_wram_banked = cpu_addr >= 16'hD000 && cpu_addr <= 16'hDFFF;
@@ -110,7 +109,7 @@ module MAC(
         end
         else if ( cpu_addr_in_cart ) begin
             if ( BANK_lock == 0 && cpu_addr_in_bootrom )
-                bootrom_addr = (cpu_addr < 16'h0100) ? cpu_addr : cpu_addr - 16'h0100;
+                bootrom_addr = cpu_addr;
             else begin
                 cart_addr = cpu_addr;
                 cart_we = cpu_we;

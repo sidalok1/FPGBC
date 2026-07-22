@@ -1,5 +1,7 @@
 `default_nettype none
-module SoC ( 
+module SoC #(
+    parameter clk_frq  = 100_000_000
+)  ( 
     input wire clk,
     input wire rst,
 
@@ -17,19 +19,21 @@ module SoC (
 
     wire [7:0] sig_cpu_din, sig_cpu_dout;
     wire [15:0] sig_cpu_addrbus;
-    wire sig_cpu_we, sig_cpu_re;
+    wire sig_cpu_we, sig_cpu_re ;
     wire [4:0] sig_cpu_intr_req;
+    assign sig_cpu_intr_req[4:2] = 0; // to be implemented
     wire sig_cpu_dbl_spd;
     wire sig_cpu_stop;
 
-    wire [15:0] sig_ppu_addri, sig_ppu_addro;
-    wire [7:0] sig_ppu_din, sig_ppu_dout;
+    wire [15:0] sig_ppu_addro;
+    wire [7:0] sig_ppu_din;
+    wire [7:0] sig_ppu_dout;
     wire sig_ppu_wout, sig_ppu_rout;
 
     wire [7:0] sig_mac_cpu_din, sig_mac_ppu_din;
 
     ClockDivider #(
-        .I_CLK_FRQ(100_000_000),
+        .I_CLK_FRQ(clk_frq),
         .O_CLK_FRQ(4_000_000)
     ) system_clock_divider (
         .rst( rst ), .en( ~sig_cpu_stop ),
@@ -49,7 +53,7 @@ module SoC (
 
     PPU pixel_processing_unit (
         .clk(clk), .rst(rst), .en(dotclk_en),
-        .addr_in(sig_ppu_addri), .addr_out(sig_ppu_addro),
+        .addr_in(sig_cpu_addrbus), .addr_out(sig_ppu_addro),
         .data_in(sig_ppu_din), .data_out(sig_ppu_dout),
         .wen(sig_cpu_we), .ren(sig_cpu_re),
         .dbl_spd(sig_cpu_dbl_spd),
@@ -57,7 +61,9 @@ module SoC (
         .rout(sig_ppu_rout),
         .hsync(hsync), .vsync(vsync),
         .r(r), .g(g), .b(b),
-        .de(de)
+        .de(de),
+        .vblank_intr(sig_cpu_intr_req[0]),
+        .stat_intr(sig_cpu_intr_req[1])
     );
 
     MAC memory_access_controller (

@@ -12,7 +12,9 @@ module PPU (
 
     output reg hsync, vsync,
     output reg [4:0] r, g, b,
-    output reg de
+    output reg de,
+    output reg stat_intr,
+    output reg vblank_intr
 );
 
     `include "RegMap.vh"
@@ -22,15 +24,15 @@ module PPU (
     
     //  | LCD_EN    |  WIN_MAP  |  WIN_EN   |  TILE_SEL |   BG_MAP  | OBJ_SIZE  |  OBJ_EN   |   BG_EN   |
     //  |                                              R/W                                              |  
-    reg [7:0] LCDC_reg = 8'b0;
+    reg [7:0] LCDC_reg = 8'h91;
     wire LCD_EN, WIN_MAP, WIN_EN, TILE_SEL, BG_MAP, OBJ_SIZE, OBJ_EN, BG_EN;
     assign {LCD_EN, WIN_MAP, WIN_EN, TILE_SEL, BG_MAP, OBJ_SIZE, OBJ_EN, BG_EN} = LCDC_reg;
 
     //  |     -     | INTR_LYC  |  INTR_M2  |  INTR_M1  |  INTR_M0  | LYC_STAT  |       LCD_MODE        |
     //  |     U     |                      R/W                      |                 R                 |
     reg [7:0] STAT_reg = 8'b0;
-    wire INTR_LYC_EN, INTR_M2_EN, INTR_M1_EN, INTR_M0_EN, LYC_STAT_EN;
-    assign {INTR_LYC_EN, INTR_M2_EN, INTR_M1_EN, INTR_M0_EN, LYC_STAT_EN} = STAT_reg[6:3];
+    wire INTR_LYC_EN, INTR_M2_EN, INTR_M1_EN, INTR_M0_EN;
+    assign {INTR_LYC_EN, INTR_M2_EN, INTR_M1_EN, INTR_M0_EN} = STAT_reg[6:3];
     //  |                                              SCY                                              |
     //  |                                              R/W                                              |
     reg [7:0] SCY_reg = 8'b0;  
@@ -134,9 +136,14 @@ module PPU (
     reg [3:0] current_obj = 0, current_obj_n;
     wire [3:0] obj_with_priority;
     wire obj_priority_valid;
-    PriorityEncoder #(
-        .WIDTH(10)
-    ) obj_priority_encoder (
+    // PriorityEncoder #(
+    //     .WIDTH(10)
+    // ) obj_priority_encoder (
+    //     .i(obj_valid & obj_x_hit),
+    //     .o(obj_with_priority),
+    //     .v(obj_priority_valid)
+    // );
+    PriorityEncoder10 obj_priority_encoder (
         .i(obj_valid & obj_x_hit),
         .o(obj_with_priority),
         .v(obj_priority_valid)
@@ -213,7 +220,6 @@ module PPU (
         reg [7:0] tile_idx = 0, tile_idx_n;
         reg [7:0] data_low = 0, data_low_n;
         reg [7:0] data_high = 0, data_high_n;
-        wire signed [7:0] tile_offset = tile_idx;
 
         reg [7:0] win_x = 0, win_x_n;
         reg [7:0] win_y = 0, win_y_n;
@@ -438,7 +444,7 @@ module PPU (
             hsync <= 1;
             vsync <= 1;
             LY_reg <= 0;
-            LCDC_reg <= 0;
+            LCDC_reg <= 8'h91;
             STAT_reg[7:3] <= 0;
             SCY_reg <= 0;
             SCX_reg <= 0;
@@ -466,7 +472,7 @@ module PPU (
                 oamScan_substate <= oamScan_substate_n;
                 oam_idx <= oam_idx_n;
                 if ( write_obj_arr ) begin
-                    obj_arr[objs_on_scanline][obj_arr_elem] <= obj_arr_data;
+                    obj_arr[objs_on_scanline][{1'b0, obj_arr_elem}] <= obj_arr_data;
                     if ( obj_arr_elem == 0 ) // adding new element to object array
                         obj_arr[objs_on_scanline][4] <= oam_idx / 4; // position in OAM
                 end
@@ -558,6 +564,8 @@ module PPU (
 
     always @* begin
         // defaults (if needed)
+        stat_intr                       = 0;
+        vblank_intr                     = 0;
         clock_phase_n                   = clock_phase;
         oam_din                         = data_in;
         vram_din                        = data_in;
@@ -635,6 +643,8 @@ module PPU (
 
 
         STAT_reg[2] = LY_reg == LYC_reg;
+        if ( INTR_LYC_EN && LY_reg == LYC_reg )
+            stat_intr = 1;
         if ( !LCD_EN ) begin
             STAT_reg[1:0] = 0;
         end
@@ -675,7 +685,7 @@ module PPU (
 
         
         data_base = (TILE_SEL == 0) ? 13'h1000 : 13'h0000;
-        tile_base = (TILE_SEL == 0) ? data_base + tile_offset : data_base + tile_idx;
+        tile_base = (TILE_SEL == 0) ? data_base - 13'(tile_idx) : data_base + 13'(tile_idx);
         if ( bgr_state ) begin
             map_base = (BG_MAP == 0) ? 13'h1800 : 13'h1C00;
             pix_x = fetch_counter + SCX_reg;
@@ -702,6 +712,8 @@ module PPU (
 
         case ( current_mode )
             oamScan: begin
+                if ( INTR_M2_EN )
+                    stat_intr = 1;
                 // Lock oam
                 oam_we = 0;
                 oam_addr = oam_idx;
@@ -774,7 +786,7 @@ module PPU (
                 case ( fetcher_state )
                     fetcher_bgr_map_addr,
                     fetcher_win_map_addr: begin 
-                        tile_addr_n = map_base + (tile_y * 32) + tile_x;
+                        tile_addr_n = map_base + (tile_y * 32) + 13'(tile_x);
                         fetcher_state_n = (bgr_state) ? fetcher_bgr_read_map : fetcher_win_read_map;
                     end
                     fetcher_bgr_read_map,
@@ -785,7 +797,7 @@ module PPU (
                     end
                     fetcher_bgr_data_addr,
                     fetcher_win_data_addr: begin
-                        tile_addr_n = tile_base + row_offset;
+                        tile_addr_n = tile_base + 13'(row_offset);
                         fetcher_state_n = (bgr_state) ? fetcher_bgr_low_data : fetcher_win_low_data;
                     end
                     fetcher_bgr_low_data,
@@ -827,8 +839,8 @@ module PPU (
                     end
                     fetcher_obj_data_addr: begin
                         tile_addr_n = (obj_attr[6] == 0) ? 
-                            obj_tile + (obj_y * 2) :
-                            obj_tile + ((obj_height - 1 - obj_y) * 2);
+                            13'(obj_tile) + (13'(obj_y) * 2) :
+                            13'(obj_tile) + ((13'(obj_height) - 1 - 13'(obj_y)) * 2);
                         fetcher_state_n = fetcher_obj_low_data;
                     end
                     fetcher_obj_low_data: begin
@@ -846,7 +858,7 @@ module PPU (
                             if ( obj_attr[5] == 1 ) begin
                                 if ( !DMG_mode ) begin
                                     // transparent pixel OR new object has lower oam idx
-                                    obj_fifo_merge_n[i] = (obj_fifo[i][5:4] == 2'b0 || obj_addr < obj_fifo[i][11:6]) ? 
+                                    obj_fifo_merge_n[i] = (obj_fifo[i][5:4] == 2'b0 || obj_addr[5:0] < obj_fifo[i][11:6]) ? 
                                         1 : 0;
                                 end
                                 else begin
@@ -856,7 +868,7 @@ module PPU (
                             else begin
                                 if ( !DMG_mode ) begin
                                     // transparent pixel OR new object has lower oam idx
-                                    obj_fifo_merge_n[7-i] = (obj_fifo[7-i][5:4] == 2'b0 || obj_addr < obj_fifo[7-i][11:6]) ? 
+                                    obj_fifo_merge_n[7-i] = (obj_fifo[7-i][5:4] == 2'b0 || obj_addr[5:0] < obj_fifo[7-i][11:6]) ? 
                                         1 : 0;
                                 end
                                 else begin
@@ -938,15 +950,15 @@ module PPU (
                                 pallet_idx_n = 4'd8;
                             end
                             else begin
-                                pallet_idx_n = {1'b0, BGP_reg[((mixed_pixel[5:4])*2)+1-:1], 1'b0}; // BGP ID * 2
+                                pallet_idx_n = {1'b0, BGP_reg[2*mixed_pixel[5:4] +:2], 1'b0}; // BGP ID * 2
                             end
                         end
                         else begin
                             if ( mixed_pixel[1] == 1 ) begin
-                                pallet_idx_n = {1'b0, OBP1_reg[((mixed_pixel[5:4])*2)+1-:1], 1'b0};
+                                pallet_idx_n = {1'b0, OBP1_reg[2*mixed_pixel[5:4] +:2], 1'b0};
                             end
                             else begin
-                                pallet_idx_n = {1'b0, OBP0_reg[((mixed_pixel[5:4])*2)+1-:1], 1'b0};
+                                pallet_idx_n = {1'b0, OBP0_reg[2*mixed_pixel[5:4] +:2], 1'b0};
                             end
                         end
                     // Stage 2
@@ -996,6 +1008,8 @@ module PPU (
                 end
             end
             h_blank: begin
+                if ( INTR_M0_EN )
+                    stat_intr = 1;
                 if ( dot_counter >= (456 - 80) ) // hsync high for last 80 dots of hblank
                     hsync_n = 1;
                 if ( dot_counter == 455 ) begin
@@ -1004,13 +1018,18 @@ module PPU (
                     oamScan_substate_n = get_y_position;
                     obj_valid_n = 0;
                     
-                    if ( LY_reg == 143 )
+                    if ( LY_reg == 143 ) begin
                         next_mode = v_blank;
-                    else
+                    end
+                    else begin
                         next_mode = oamScan;
+                    end
                 end
             end
             v_blank: begin
+                if ( INTR_M1_EN )
+                    stat_intr = 1;
+                vblank_intr = 1;
                 if ( LY_reg >= (153 - 8) ) // vsync high for last 8 scanlines
                     vsync_n = 1;
                 if ( dot_counter == 455 ) begin
@@ -1094,7 +1113,7 @@ module PPU (
                     if ( addr_in >= 16'h8000 && addr_in <= 16'h9FFF ) // VRAM address range 
                         if ( VBK_reg[0] == 1'b0 )
                             data_out = current_mode != drawing ? vram0_dout : 8'hFF;
-                        if ( VBK_reg[0] == 1'b1 )
+                        else // if ( VBK_reg[0] == 1'b1 )
                             data_out = current_mode != drawing ? vram1_dout : 8'hFF;
                     else
                     if ( addr_in >= 16'hFE00 && addr_in <= 16'hFE9F ) // OAM address range

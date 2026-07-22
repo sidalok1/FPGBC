@@ -49,18 +49,23 @@ module ControlUnit(
     reg read_from_mem = 0;
     assign read = fetch | read_from_mem;
     
-    reg [4:0] state = S0, next = S0;
-    reg [4:0] intr_state = S0, intr_state_n, intr_return_state = S0, intr_return_state_n;
+    reg [5:0] state = S0, next = S0;
+    reg [5:0] intr_state = S0, intr_state_n, intr_return_state = S0, intr_return_state_n;
     reg prefix = 0, prefix_next = 0, prefix_return = 0, prefix_return_n;
 
     reg IME;
-    reg set_IME = 0, set_IME_next = 0, unset_IME = 0;
+    reg set_IME = 0, set_IME_next = 0, unset_IME;
 
     wire [2:0] next_interrupt;
     wire intr_valid;
-    PriorityEncoder #(
-        .WIDTH(5)
-    ) intr_priority_encoder (
+    // PriorityEncoder #(
+    //     .WIDTH(5)
+    // ) intr_priority_encoder (
+    //     .i( IE[4:0] & IF[4:0] ),
+    //     .o( next_interrupt ),
+    //     .v( intr_valid )
+    // );
+    PriorityEncoder5 intr_priority_encoder (
         .i( IE[4:0] & IF[4:0] ),
         .o( next_interrupt ),
         .v( intr_valid )
@@ -117,13 +122,27 @@ module ControlUnit(
     wire halt_condition;
     assign halt_condition = IR[5:0] == 6'b110_110;
 
+    // integer i = 0, j = 0;
+    // always @( posedge clk ) if ( rst ) begin
+    //     j <= 0;
+    //     i <= 0;
+    // end 
+    // else begin
+    //     $display("Sys-cycle: %d", j);
+    //     j <= j + 1;
+    //     if ( en ) begin
+    //         $display("M-cycle: %d", i);
+    //         i <= i + 1;
+    //     end
+    // end
+
     always @ ( posedge clk ) begin
         if ( rst ) begin
             state <= S0;
             intr_state <= S0;
             intr_return_state <= 0;
             IR <= 0;
-            set_IME <= 0;
+            set_IME_next <= 0;
             IME <= 0;
             prefix <= 0;
             prefix_return <= 0;
@@ -226,6 +245,7 @@ module ControlUnit(
                 unset_IME = 1;
                 fetch = 1;
             end
+            default:; // one-hot
             endcase
         end
         else if ( prefix ) begin 
@@ -241,8 +261,8 @@ module ControlUnit(
                     data_sel = DIN;
                     read_from_mem = 1;
                 end else begin
-                    rd = (IR[7:6] == 2'b01) ? CTR : IR[2:0]; // no rd for BIT
-                    r1 = IR[2:0];
+                    rd = (IR[7:6] == 2'b01) ? CTR : {1'b0, IR[2:0]}; // no rd for BIT
+                    r1 = {1'b0, IR[2:0]};
                     r2 = CTR;
                     ctr = {5'b0, IR[5:3]};
                     alu_op = {2'b10, IR[7:6]};
@@ -268,11 +288,15 @@ module ControlUnit(
                 fetch = 1;
                 prefix_next = 0;
             end
+            default:; // one-hot
             endcase
         end
         else casez ( IR )
         'b00_000_000: begin
-            $display("nop");
+            `ifdef DEBUG
+                if ( en )
+                $display("nop");
+            `endif
             // nop
             rd_idu = PC;
             fetch = 1;
@@ -299,6 +323,7 @@ module ControlUnit(
                 rd_idu = PC;
                 fetch = 1;
             end
+            default:; // one-hot
             endcase
         end
         'b00_??0_010: begin
@@ -318,25 +343,34 @@ module ControlUnit(
                 rd_idu = PC;
                 fetch = 1;
             end
+            default:; // one-hot
             endcase
         end
         'b00_??0_011: begin
-            $display("inc r16");
+            `ifdef DEBUG
+                if ( en )
+                $display("inc r16");
+            `endif
+            // 
             case ( state )
             S0: begin
                 next = S1;
                 addrh = MSB[IR[5:4]];
                 addrl = LSB[IR[5:4]];
-                rd_idu = IR[5:4];
+                rd_idu = {1'b0, IR[5:4]};
             end
             S1: begin
                 rd_idu = PC;
                 fetch = 1;
             end
+            default:; // one-hot
             endcase
         end
         'b00_???_100: begin
-            $display("inc r8");
+            `ifdef DEBUG
+                if ( en )
+                $display("inc r8");
+            `endif
             case ( state )
             S0: begin
                 if ( IR[5:3] == 'b110 ) begin
@@ -349,8 +383,8 @@ module ControlUnit(
                 end else begin
                     rd_idu = PC;
                     fetch = 1;
-                    rd = IR[5:3];
-                    r1 = IR[5:3];
+                    rd = {1'b0, IR[5:3]};
+                    r1 = {1'b0, IR[5:3]};
                     r2 = ONE;
                     alu_op = ADD;
                     data_sel = ALU;
@@ -372,10 +406,14 @@ module ControlUnit(
                 rd_idu = PC;
                 fetch = 1;
             end
+            default:; // one-hot
             endcase
         end
         'b00_???_101: begin
-            $display("dec r8");
+            `ifdef DEBUG
+                if ( en )
+                $display("dec r8");
+            `endif
             case ( state )
             S0: begin
                 if ( IR[5:3] == 'b110 ) begin
@@ -388,8 +426,8 @@ module ControlUnit(
                 end else begin
                     rd_idu = PC;
                     fetch = 1;
-                    rd = IR[5:3];
-                    r1 = IR[5:3];
+                    rd = {1'b0, IR[5:3]};
+                    r1 = {1'b0, IR[5:3]};
                     r2 = ONE;
                     alu_op = SUB;
                     data_sel = ALU;
@@ -411,10 +449,14 @@ module ControlUnit(
                 rd_idu = PC;
                 fetch = 1;
             end
+            default:; // one-hot
             endcase
         end
         'b00_???_110: begin
-            $display("ld r8, imm8");
+            `ifdef DEBUG
+                if ( en )
+                $display("ld r8, imm8");
+            `endif
             case ( state )
             S0: begin
                 rd_idu = PC;
@@ -425,7 +467,7 @@ module ControlUnit(
                     rd = Z;
                 end else begin
                     next = S2;
-                    rd = IR[5:3];
+                    rd = {1'b0, IR[5:3]};
                 end
             end
             S1: begin
@@ -439,6 +481,7 @@ module ControlUnit(
                 rd_idu = PC;
                 fetch = 1;
             end
+            default:; // one-hot
             endcase
         end
         'b00_???_111: begin
@@ -508,6 +551,7 @@ module ControlUnit(
                 rd_idu = PC;
                 fetch = 1;
             end
+            default:; // one-hot
             endcase
         end
         'b00_??1_001: begin
@@ -533,10 +577,14 @@ module ControlUnit(
                 rd_idu = PC;
                 fetch = 1;
             end
+            default:; // one-hot
             endcase
         end
         'b00_??1_010: begin
-            $display("ld a, [r16mem]");
+            `ifdef DEBUG
+                if ( en )
+                $display("ld a, [r16mem]");
+            `endif
             case ( state )
             S0: begin
                 next = S1;
@@ -552,22 +600,27 @@ module ControlUnit(
                 rd_idu = PC;
                 fetch = 1;
             end
+            default:; // one-hot
             endcase
         end
         'b00_??1_011: begin
-            $display("dec r16");
+            `ifdef DEBUG
+                if ( en )
+                $display("dec r16");
+            `endif
             case ( state )
             S0: begin
                 next = S1;
                 addrh = MSB[IR[5:4]];
                 addrl = LSB[IR[5:4]];
-                rd_idu = IR[5:4];
+                rd_idu = {1'b0, IR[5:4]};
                 idu_op = DEC;
             end
             S1: begin
                 rd_idu = PC;
                 fetch = 1;
             end
+            default:; // one-hot
             endcase
         end
         'b00_010_000: begin
@@ -582,6 +635,7 @@ module ControlUnit(
                     // end 
                 end
                 // S1: $finish();
+            default:; // one-hot
             endcase
         end
         'b00_011_000: begin
@@ -612,6 +666,7 @@ module ControlUnit(
                 rd_idu = PC;
                 fetch = 1;
             end
+            default:; // one-hot
             endcase
         end
         'b00_1??_000: begin
@@ -651,6 +706,7 @@ module ControlUnit(
                 rd_idu = PC;
                 fetch = 1;
             end
+            default:; // one-hot
             endcase
         end
         'b01_???_???: begin
@@ -665,7 +721,7 @@ module ControlUnit(
                     next = S2;
                     addrh = H;
                     addrl = L;
-                    r1 = IR[2:0];
+                    r1 = {1'b0, IR[2:0]};
                     write = 1;
                 end 
                 else if ( IR[2:0] == 'b110 ) begin
@@ -674,13 +730,13 @@ module ControlUnit(
                     addrl = L;
                     data_sel = DIN;
                     read_from_mem = 1;
-                    rd = IR[5:3];
+                    rd = {1'b0, IR[5:3]};
                 end
                 else begin
                     fetch = 1;
                     rd_idu = PC;
-                    r1 = IR[2:0];
-                    rd = IR[5:3];
+                    r1 = {1'b0, IR[2:0]};
+                    rd = {1'b0, IR[5:3]};
                     data_sel = ALU;
                 end
             end
@@ -699,6 +755,7 @@ module ControlUnit(
                 fetch = 1;
                 rd_idu = PC;
             end
+            default:; // one-hot
             endcase
         end
         'b10_???_???: begin
@@ -713,7 +770,7 @@ module ControlUnit(
                     read_from_mem = 1;
                 end else begin
                     r1 = A;
-                    r2 = IR[2:0];
+                    r2 = {1'b0, IR[2:0]};
                     data_sel = ALU; 
                     if ( IR[5:3] == 'b111 ) begin
                         alu_op = SUB;
@@ -740,6 +797,7 @@ module ControlUnit(
                 rd_idu = PC;
                 fetch = 1;
             end
+            default:; // one-hot
             endcase
         end
         'b11_0??_000: begin
@@ -782,11 +840,18 @@ module ControlUnit(
                 rd_idu = PC;
                 fetch = 1;
             end
+            default:; // one-hot
             endcase
         end
         'b11_0?1_001: begin
-            if ( IR[4] )    `executing("reti")
-            else            `executing("ret")
+            if ( IR[4] ) begin
+                //
+                `executing("reti")
+            end
+            else begin
+                //            
+                `executing("ret")
+            end
             case ( state )
             S0: begin
                 addrh = SPH;
@@ -826,6 +891,7 @@ module ControlUnit(
                 rd_idu = PC;
                 fetch = 1;
             end
+            default:; // one-hot
             endcase
         end
         'b11_??0_001: begin
@@ -853,6 +919,7 @@ module ControlUnit(
                 rd_idu = PC;
                 fetch = 1;
             end
+            default:; // one-hot
             endcase
         end
         'b11_101_001: begin
@@ -864,6 +931,7 @@ module ControlUnit(
                 rd_idu = PC;
                 fetch = 1;
             end
+            default:; // one-hot
             endcase
         end
         'b11_0??_010: begin
@@ -899,6 +967,7 @@ module ControlUnit(
                 rd_idu = PC;
                 fetch = 1;
             end
+            default:; // one-hot
             endcase
         end
         'b11_000_011: begin
@@ -929,6 +998,7 @@ module ControlUnit(
                 rd_idu = PC;
                 fetch = 1;
             end
+            default:; // one-hot
             endcase
         end
         'b11_0??_100: begin
@@ -985,6 +1055,7 @@ module ControlUnit(
                 rd_idu = PC;
                 fetch = 1;
             end
+            default:; // one-hot
             endcase
         end
         'b11_001_101: begin
@@ -1033,6 +1104,7 @@ module ControlUnit(
                 rd_idu = PC;
                 fetch = 1;
             end
+            default:; // one-hot
             endcase
         end
         'b11_??0_101: begin
@@ -1065,6 +1137,7 @@ module ControlUnit(
                 rd_idu = PC;
                 fetch = 1;
             end
+            default:; // one-hot
             endcase
         end
         'b11_???_110: begin
@@ -1079,7 +1152,7 @@ module ControlUnit(
             end
             S1: begin
                 r1 = A;
-                r2 = IR[2:0];
+                r2 = {1'b0, IR[2:0]};
                 data_sel = ALU; 
                 if ( IR[5:3] == 'b111 ) begin
                     alu_op = SUB;
@@ -1091,6 +1164,7 @@ module ControlUnit(
                 rd_idu = PC;
                 fetch = 1;
             end
+            default:; // one-hot
             endcase
         end
         'b11_100_000: begin
@@ -1115,6 +1189,7 @@ module ControlUnit(
                 rd_idu = PC;
                 fetch = 1;
             end
+            default:; // one-hot
             endcase
         end
         'b11_110_000: begin
@@ -1139,6 +1214,7 @@ module ControlUnit(
                 rd_idu = PC;
                 fetch = 1;
             end
+            default:; // one-hot
             endcase
         end
         'b11_100_010: begin
@@ -1156,6 +1232,7 @@ module ControlUnit(
                 rd_idu = PC;
                 fetch = 1;
             end
+            default:; // one-hot
             endcase
         end
         'b11_110_010: begin
@@ -1174,6 +1251,7 @@ module ControlUnit(
                 rd_idu = PC;
                 fetch = 1;
             end
+            default:; // one-hot
             endcase
         end
         'b11_101_010: begin
@@ -1204,6 +1282,7 @@ module ControlUnit(
                 rd_idu = PC;
                 fetch = 1;
             end
+            default:; // one-hot
             endcase
         end
         'b11_111_010: begin
@@ -1235,6 +1314,7 @@ module ControlUnit(
                 rd_idu = PC;
                 fetch = 1;
             end
+            default:; // one-hot
             endcase
         end
         'b11_101_000: begin
@@ -1268,6 +1348,7 @@ module ControlUnit(
                 rd_idu = PC;
                 fetch = 1;
             end
+            default:; // one-hot
             endcase
         end
         'b11_111_000: begin
@@ -1297,6 +1378,7 @@ module ControlUnit(
                 rd_idu = PC;
                 fetch = 1;
             end
+            default:; // one-hot
             endcase
         end
         'b11_111_001: begin
@@ -1313,6 +1395,7 @@ module ControlUnit(
                 rd_idu = PC;
                 fetch = 1;
             end
+            default:; // one-hot
             endcase
         end
         'b11_110_011: begin
@@ -1323,6 +1406,7 @@ module ControlUnit(
                 rd_idu = PC;
                 fetch = 1;
             end
+            default:; // one-hot
             endcase
         end
         'b11_111_011: begin
@@ -1333,6 +1417,7 @@ module ControlUnit(
                 rd_idu = PC;
                 fetch = 1;
             end
+            default:; // one-hot
             endcase
         end
         'b11_???_111: begin
@@ -1372,10 +1457,14 @@ module ControlUnit(
                 rd_idu = PC;
                 fetch = 1;
             end
+            default:; // one-hot
             endcase
         end
         'hCB: begin
-            $display("prefix");
+            `ifdef DEBUG
+                if ( en )
+                $display("prefix");
+            `endif
             prefix_next = 1;
             rd_idu = PC;
             fetch = 1;

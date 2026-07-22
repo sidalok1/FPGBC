@@ -30,6 +30,6 @@ localparam OBPI     = 16'hFF6A;
 localparam OBPD     = 16'hFF6B;
 localparam OPRI     = 16'hFF6C;
 
-localparam SVBK     = 17'hFF70;
+localparam SVBK     = 16'hFF70;
 
 localparam IE       = 16'hFFFF;

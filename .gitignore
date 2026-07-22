@@ -87,6 +87,7 @@ SM83.xpr
 **.mem
 **.gb
 !**/cgb_boot.mem
+*.dat
 
 gbfilt/target/
 
@@ -97,3 +98,5 @@ gbfilt/target/
 .library_mapping.xml
 .project
 settings.json
+
+build

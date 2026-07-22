@@ -11,7 +11,7 @@ module ALU ( op, in1, in2, out, flags_in, flags_out );
     output wire [7:0] out;
     output wire [3:0] flags_out;
     
-    reg z = 0, n = 0, c = 0, h = 0;
+    reg z, n, c, h;
     assign flags_out = {z, n, h, c};
 
     wire zero = flags_in[3];
@@ -34,8 +34,8 @@ module ALU ( op, in1, in2, out, flags_in, flags_out );
     wire [7:0] offset;
     assign offset = daa_offsets[which_offset];
 
-    reg [8:0] full_result = 0;
-    reg [4:0] half_result = 0;
+    reg [8:0] full_result;
+    reg [4:0] half_result;
 
     assign out = full_result[7:0];
 
@@ -44,6 +44,9 @@ module ALU ( op, in1, in2, out, flags_in, flags_out );
         n = subtract;
         h = half;
         c = carry;
+        full_result = 0;
+        half_result = 0;
+
         case (op) 
         PAS: full_result[7:0] = in1;
         ADD: begin
@@ -137,7 +140,7 @@ module ALU ( op, in1, in2, out, flags_in, flags_out );
                 c = full_result[8];
             end
             SRA: begin
-                full_result = {in1[7], in1[7:1]};
+                full_result = {1'b0, in1[7], in1[7:1]};
                 z = full_result == 0; // full_result[7:0] == 0 iff in1[7] == 0
                 n = 0;
                 h = 0;
@@ -151,7 +154,7 @@ module ALU ( op, in1, in2, out, flags_in, flags_out );
                 c = 0;
             end
             SRL: begin
-                full_result = {1'b0, in1[7:1]};
+                full_result = {2'b0, in1[7:1]};
                 z = full_result == 0;
                 n = 0;
                 h = 0;

@@ -4,6 +4,7 @@ project(gbc_sim CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 
+
 # ---------------------------------------------------------------------------
 # Find Verilator
 # ---------------------------------------------------------------------------
@@ -46,17 +47,32 @@ set(HDL_SOURCES
     src/IDU.v
     src/CondCheck.v
     src/PriorityEncoder.v
+    src/PriorityEncoder5.v
+    src/PriorityEncoder10.v
 )
 
 verilate(gbc_sim
     SOURCES       ${HDL_SOURCES}
     VERILATOR_ARGS
+        -O3 --x-assign fast --x-initial fast --no-assert
         -y "include"
         -y "roms" 
         -Wall 
-        -Wno-fatal 
-        --timing
+        -Wno-EOFNEWLINE
+        -Wno-UNUSED
+        -Wno-UNSIGNED
+        -Wno-PROCASSINIT
+        -Wno-WIDTHTRUNC
+        --report-unoptflat
+        --prof-cfuncs
+        # --prof-exec
+    OPT_FAST      "-O3 -march=native"
     TOP_MODULE    System
+    TRACE_FST
+    PREFIX        Vgbc
 )
+# Target compile and link profiling options
+target_compile_options(gbc_sim PRIVATE -pg)
+target_link_options(gbc_sim PRIVATE -pg)
 
 target_link_libraries(gbc_sim PRIVATE ${SDL3_TARGET})

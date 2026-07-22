@@ -1,6 +1,6 @@
 `default_nettype none
 module MBC #(
-    parameter type = 0, // 0 means no MBC
+    parameter mbc_type = 0, // 0 means no MBC
     parameter ROMFILE = ""
 ) (
     input wire clk, en, rst,
@@ -10,8 +10,8 @@ module MBC #(
     input wire re, we
 );
 
-generate case (type)
-0: begin
+generate case (mbc_type)
+0: begin : none_mbc
     reg [7:0] ROM [0:(32*1024)-1];
     reg [14:0] rom_addr = 0;
     wire [7:0] rom_dout = ROM[rom_addr];
@@ -46,15 +46,15 @@ generate case (type)
         ram_din = 0;
         ram_we = 0;
 
-        if ( addr < 'h8000 ) begin
+        if ( addr < 16'h8000 ) begin
             rom_addr = addr;
             if ( re )
                 dout = rom_dout;
             // if ( we ) do nothing for writes to ROM
         end
         else
-        if ( addr >= 'hA000 && addr <= 'hBFFF ) begin
-            ram_addr = addr - 'hA000;
+        if ( addr >= 16'hA000 && addr <= 16'hBFFF ) begin
+            ram_addr = addr - 16'hA000;
             if ( re )
                 dout = ram_dout;
             if ( we ) begin
