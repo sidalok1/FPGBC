@@ -49,6 +49,7 @@ set(HDL_SOURCES
     src/PriorityEncoder.v
     src/PriorityEncoder5.v
     src/PriorityEncoder10.v
+    src/Serial.v
 )
 
 verilate(gbc_sim

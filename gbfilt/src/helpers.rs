@@ -1,6 +1,6 @@
 use crate::{reg::{Flags, R16, R8}};
 
-use std::fmt::{Display, Formatter, Result, Debug};
+use std::fmt::{Debug, Display, Formatter, Result};
 
 enum InstTypes {
 	Misc,
@@ -93,32 +93,12 @@ macro_rules! unimp {
 
 impl RunState {
 	pub fn decode(&mut self, inst: &str) -> String {
-		// if self.imm8 {
-		// 	self.imm8 = false;
-		// 	String::from(inst)
-		// } else if self.imm16 {
-		// 	match &self.imm {
-		// 		Some(s) => {
-		// 			let imm_str = format!("{}{}", s, inst);
-		// 			self.imm16 = false;
-		// 			self.imm = None;
-		// 			imm_str
-		// 		},
-		// 		None => {
-		// 			self.imm = Some(String::from(inst));
-		// 			String::new()
-		// 		}
-		// 	}
-		// } else if self.prefix {
-		// 	self.prefix = false;
-		// 	String::from("Prefixed insts not implemented")
-		// } else {
-		// 	format!("{}", self.decode_xxxxxxxx(hex_to_u8(inst)))
-		// }
-		// IR register holds only instructions, not immediates
-		// The prefix part might still be necessary in the future
 		match hex_to_u8(inst) {
-			Some(val) 	=> format!("{}", self.decode_xxxxxxxx(val)),
+			Some(val) 	=> 
+				format!("{}", 
+					if self.prefix 	{self.pdecode_xxxxxxxx(val)}
+					else 			{self.decode_xxxxxxxx(val)}
+				),
 			None 		=> format!("???")
 		}
 		// format!("{}", self.decode_xxxxxxxx(hex_to_u8(inst)))
@@ -129,6 +109,7 @@ impl RunState {
 			0b00 => self.decode_00_xxxxxx(inst),
 			0b01 => self.decode_01_xxxxxx(inst),
 			0b10 => self.decode_10_xxx_xxx(inst),
+			0b11 => self.decode_11_xxx_xxx(inst),
 			_ => unimp!(inst)
 		}
 	}
@@ -155,7 +136,7 @@ impl RunState {
 				}
 			}
 			0b111 => self.decode_00_xxx_111(inst),
-			_ => unimp!(inst)
+			_ => panic!("Should not happen!")
 		}
 	}
 
@@ -250,7 +231,7 @@ impl RunState {
 				0b101 => "cpl",
 				0b110 => "scf",
 				0b111 => "ccf",
-				_ => panic!("getbits returned more than 3 bit uint!")
+				_ => panic!("Should not happen!")
 			}), 
 			itype: Arith8bit 
 		}
@@ -297,5 +278,252 @@ impl RunState {
 		}
 	}
 
-	
+	fn decode_11_xxx_xxx(&mut self, inst: u8) -> Instruction {
+		match getbits(inst, 2, 0) {
+			0b000 => self.decode_11_xxx_000(inst),
+			0b001 => self.decode_11_xxx_001(inst),
+			0b010 => self.decode_11_xxx_010(inst),
+			0b011 => self.decode_11_xxx_011(inst),
+			0b100 => self.decode_11_xxx_100(inst),
+			0b101 => self.decode_11_xxx_101(inst),
+			0b110 => self.decode_11_xxx_110(inst),
+			0b111 => self.decode_11_xxx_111(inst),
+			_ => panic!("Should not happen!")
+		}
+	}
+
+	fn decode_11_xxx_000(&mut self, inst: u8) -> Instruction {
+		match getbits(inst, 5, 5) {
+			0b0 => Instruction { 
+				mnemonic: format!("ret {}", Flags::cond(getbits(inst, 4, 3))), 
+				itype: ControlFlow 
+			},
+			0b1 => self.decode_11_1_xx_000(inst),
+			_ => panic!("Should not happen!")
+		}
+	}
+
+	fn decode_11_1_xx_000(&mut self, inst: u8) -> Instruction {
+		match getbits(inst, 4, 3) {
+			0b00 => Instruction { 
+				mnemonic: String::from("ldh [imm8], a"), 
+				itype: Load8bit
+			},
+			0b01 => Instruction { 
+				mnemonic: String::from("add sp, imm8"), 
+				itype: Arith8bit
+			},
+			0b10 => Instruction { 
+				mnemonic: String::from("ldh a, [imm8]"), 
+				itype: Load8bit
+			},
+			0b11 => Instruction { 
+				mnemonic: String::from("ld hl, sp + imm8"), 
+				itype: Load8bit
+			},
+			_ => panic!("Should not happen!")
+		}
+	}
+
+	fn decode_11_xxx_001(&mut self, inst: u8) -> Instruction {
+		match getbits(inst, 3, 3) {
+			0b0 => Instruction { 
+				mnemonic: format!("pop {}", R16::r16stk(getbits(inst, 5, 4))), 
+				itype: Load16bit
+			},
+			0b1 => self.decode_11_xx_1_001(inst),
+			_ => panic!("Should not happen!")
+		}
+	}
+
+	fn decode_11_xx_1_001(&mut self, inst: u8) -> Instruction {
+		match getbits(inst, 5, 4) {
+			0b00 => Instruction { 
+				mnemonic: String::from("ret"), 
+				itype: ControlFlow 
+			},
+			0b01 => Instruction { 
+				mnemonic: String::from("reti"), 
+				itype: ControlFlow 
+			},
+			0b10 => Instruction { 
+				mnemonic: String::from("jp hl"), 
+				itype: ControlFlow 
+			},
+			0b11 => Instruction { 
+				mnemonic: String::from("ld sp, hl"), 
+				itype: Load16bit
+			},
+			_ => panic!("Should not happen!")
+		}
+	}
+
+	fn decode_11_xxx_010(&mut self, inst: u8) -> Instruction {
+		match getbits(inst, 5, 5) {
+			0b0 => self.decode_11_0_xx_010(inst),
+			0b1 => self.decode_11_1_xx_010(inst),
+			_ => panic!("Should not happen!")
+		}
+	}
+
+	fn decode_11_0_xx_010(&mut self, inst: u8) -> Instruction {
+		Instruction { 
+			mnemonic: format!("jp {}, imm16", Flags::cond(getbits(inst, 4, 3))), 
+			itype: ControlFlow
+		}
+	}
+
+	fn decode_11_1_xx_010(&mut self, inst: u8) -> Instruction {
+		match getbits(inst, 4, 3) {
+			0b00 => Instruction { 
+				mnemonic: String::from("ldh [c], a"), 
+				itype: Load8bit 
+			},
+			0b01 => Instruction { 
+				mnemonic: String::from("ld [imm16], a"), 
+				itype: Load16bit
+			},
+			0b10 => Instruction { 
+				mnemonic: String::from("ldh a, [c]"), 
+				itype: Load8bit
+			},
+			0b11 => Instruction { 
+				mnemonic: String::from("ld a, [imm16]"), 
+				itype: Load16bit
+			},
+			_ => panic!("Should not happen!")
+		}
+	}
+
+	fn decode_11_xxx_011(&mut self, inst:u8) -> Instruction {
+		match getbits(inst, 5, 3) {
+			0b000 => Instruction { 
+				mnemonic: String::from("jp imm16"), 
+				itype: ControlFlow
+			},
+			0b001 => {
+				self.prefix = true;
+				Instruction { 
+					mnemonic: String::from("prefix"), 
+					itype: Misc 
+				}
+			},
+			0b010 |
+			0b011 |
+			0b100 |
+			0b101 => invalid!(inst),
+			0b110 => Instruction { 
+				mnemonic: String::from("di"), 
+				itype: ControlFlow 
+			},
+			0b111 => Instruction { 
+				mnemonic: String::from("ei"), 
+				itype: ControlFlow 
+			},
+			_ => panic!("Should not happen!")
+		}
+	}
+
+	fn decode_11_xxx_100(&mut self, inst: u8) -> Instruction {
+		match getbits(inst, 5, 5) {
+			0b0 => Instruction { 
+				mnemonic: format!("call {}, imm16",
+					Flags::cond(getbits(inst, 4, 3))), 
+				itype: ControlFlow
+			},
+			0b1 => invalid!(inst),
+			_ => panic!("Should not happen!")
+		}
+	}
+
+	fn decode_11_xxx_101(&mut self, inst: u8) -> Instruction {
+		match getbits(inst, 3, 3) {
+			0b0 => Instruction { 
+				mnemonic: format!("push {}",
+					R16::r16stk(getbits(inst, 5, 4))), 
+				itype: Load16bit 
+			},
+			0b1 => match getbits(inst, 5, 4) {
+				0b00 => Instruction { 
+					mnemonic: String::from("call imm16"), 
+					itype: ControlFlow
+				},
+				0b01 |
+				0b10 |
+				0b11 => invalid!(inst),
+				_ => panic!("Should not happen!")
+			},
+			_ => panic!("Should not happen!")
+		}
+	}
+
+	fn decode_11_xxx_110(&mut self, inst: u8) -> Instruction {
+		Instruction { 
+			mnemonic: format!("{} a, imm8",
+				match getbits(inst, 5, 3) {
+					0b000 => "add",
+					0b001 => "adc",
+					0b010 => "sub",
+					0b011 => "sbc",
+					0b100 => "and",
+					0b101 => "xor",
+					0b110 => "or",
+					0b111 => "cp",
+					_ => panic!("Should not happen!")
+				}
+			), 
+			itype: Arith8bit 
+		}
+	}
+
+	fn decode_11_xxx_111(&mut self, inst: u8) -> Instruction {
+		Instruction {
+			mnemonic: format!("rst 0x{:X}", getbits(inst, 5, 3) * 8),
+			itype: ControlFlow
+		}
+	}
+
+	fn pdecode_xxxxxxxx(&mut self, inst: u8) -> Instruction {
+		self.prefix = false;
+		let reg = R8::r8(getbits(inst, 2, 0));
+		match getbits(inst, 7, 6) {
+			0b00 => Instruction { 
+				mnemonic: format!("{} {}",
+					match getbits(inst, 5, 3) {
+						0b000 => "rlc",
+						0b001 => "rrc",
+						0b010 => "rl",
+						0b011 => "rr",
+						0b100 => "sla",
+						0b101 => "sra",
+						0b110 => "swap",
+						0b111 => "srl",
+						_ => panic!("Should not happen!")
+					},
+					reg
+				), 
+				itype: Arith8bit 
+			},
+			0b01 => Instruction { 
+				mnemonic: format!("bit {}, {}",
+					getbits(inst, 5, 3),
+					reg), 
+				itype: Arith8bit 
+			},
+			0b10 => Instruction { 
+				mnemonic: format!("res {}, {}",
+					getbits(inst, 5, 3),
+					reg), 
+				itype: Arith8bit 
+			},
+			0b11 => Instruction { 
+				mnemonic: format!("set {}, {}",
+					getbits(inst, 5, 3),
+					reg), 
+				itype: Arith8bit 
+			},
+			_ => panic!("Should not happen!")
+		}
+	}
+
 }

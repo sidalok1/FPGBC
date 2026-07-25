@@ -147,7 +147,7 @@ module ControlUnit(
             prefix <= 0;
             prefix_return <= 0;
         end
-        else if ( en | wake ) begin
+        else if ( en ) begin
             state <= next;
             intr_state <= intr_state_n;
             intr_return_state <= intr_return_state_n;
@@ -201,7 +201,7 @@ module ControlUnit(
         
 
         // begin state logic
-        if ( IME && intr_valid ) begin
+        if ( IME & intr_valid ) begin
             case ( intr_state ) 
             S0: begin
                 // save current state, to return to on reti
@@ -658,6 +658,7 @@ module ControlUnit(
                 idu_op = ADJ;
                 addrl = PCH;
                 addrh = CTR;
+                rd_idu = _W;
                 ctr = 8'b0;
             end
             S2: begin
@@ -698,6 +699,7 @@ module ControlUnit(
                 idu_op = ADJ;
                 addrl = PCH;
                 addrh = CTR;
+                rd_idu = _W;
                 ctr = 8'b0;
             end
             S3: begin
@@ -872,7 +874,7 @@ module ControlUnit(
                 next = S2;
             end
             S2: begin
-                addrh = W;
+                addrh = W;  
                 addrl = Z;
                 idu_op = ZER;
                 rd_idu = PC;

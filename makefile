@@ -9,7 +9,17 @@ configure: ./CMakeLists.txt
 build: configure
 	cmake --build $(BUILD_DIR) -j$(shell nproc)
 
-run: build
+roms/main.mem: src/main.asm
+	rgbasm -o _out/main.o src/main.asm -I include
+	rgblink -o _out/main.gb _out/main.o
+	python3 bintoascii.py _out/main.gb -o roms/main.mem
+
+roms/testboot.mem: src/boot.asm
+	rgbasm -o _out/boot.o src/boot.asm -I include
+	rgblink -o _out/boot.gb _out/boot.o
+	python3 bintoascii.py _out/boot.gb -o roms/testboot.mem -n 2304
+
+run: build roms/main.mem roms/testboot.mem
 	./$(BUILD_DIR)/gbc_sim
 
 _out/dump.fst: run

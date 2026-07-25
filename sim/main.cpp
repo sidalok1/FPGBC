@@ -35,8 +35,8 @@ static constexpr int WIN_W       = GBC_W * SCALE;
 static constexpr int WIN_H       = GBC_H * SCALE;
 
 // How many master-clock cycles to simulate before giving up if no frame arrives
-static constexpr uint64_t MAX_CYCLES = 8e6;  // ~2 seconds of GBC time
-// static constexpr uint64_t MAX_CYCLES = 1000;
+// static constexpr uint64_t MAX_CYCLES = 8e6;  // ~2 seconds of GBC time
+static constexpr uint64_t MAX_CYCLES = 8e5;
 static constexpr uint64_t CYCLE_INTERVAL = long(1e7);
 static constexpr int clk_period_half = int(((1/4e6)*1e12)/2);
 
@@ -109,6 +109,10 @@ int main(int argc, char** argv) {
     uint8_t prev_hsync = 1;
     uint8_t prev_vsync = 1;
 
+    uint8_t prev_sck = 0;
+    int serial_counter = 0;
+    char sdata = 0;
+
     // Current write position within the visible frame
     int cur_x = 0;
     int cur_y = 0;
@@ -121,6 +125,8 @@ int main(int argc, char** argv) {
     // gbc->done = 0;
     gbc->clk = 0;
     gbc->rst = 1;
+    gbc->sck_i = 0;
+    gbc->sdi = 0;
     for (int i = 0; i < 8; i++) {
         gbc->clk ^= 1;
         ctx->timeInc(clk_period_half);
@@ -130,33 +136,34 @@ int main(int argc, char** argv) {
     
     auto end = high_resolution_clock::now();
     auto duration = duration_cast<microseconds>(end - start);
-    std::cout   << "Initialization time: "
-                << duration.count()
-                << " us" << std::endl;
+    // std::cout   << "Initialization time: "
+    //             << duration.count()
+    //             << " us" << std::endl;
 
     
 
     // --- Main simulation loop ----------------------------------------------
     uint64_t cycle = 0;
+    std::cout << std::endl;
 
     while (running && cycle < MAX_CYCLES) {
     // while (running) {
 
         // Tick the clock (two eval() calls = one full master clock cycle)
-        if ( cycle % CYCLE_INTERVAL == 0 ){
-            start = high_resolution_clock::now();
-        }
+        // if ( cycle % CYCLE_INTERVAL == 0 ){
+        //     start = high_resolution_clock::now();
+        // }
         gbc->clk = 0; gbc->eval();
         ctx->timeInc(clk_period_half);
         gbc->clk = 1; gbc->eval();
-        if ( cycle % CYCLE_INTERVAL == 0 ){
-            end = high_resolution_clock::now();
-            duration = duration_cast<microseconds>(end - start);
-            std::cout   << "Cycle " << cycle << " time: "
-                        << duration.count()
-                        << " us" << std::endl;            
-            start = high_resolution_clock::now();
-        }
+        // if ( cycle % CYCLE_INTERVAL == 0 ){
+        //     end = high_resolution_clock::now();
+        //     duration = duration_cast<microseconds>(end - start);
+        //     std::cout   << "Cycle " << cycle << " time: "
+        //                 << duration.count()
+        //                 << " us" << std::endl;            
+        //     start = high_resolution_clock::now();
+        // }
         ctx->timeInc(clk_period_half);
 
         // --- Decode PPU outputs on the rising edge -------------------------
@@ -228,6 +235,20 @@ int main(int argc, char** argv) {
         prev_hsync = gbc->hsync;
         prev_vsync = gbc->vsync;
 
+        bool sck_rising = (prev_sck == 0) && (gbc->sck_o == 1);
+        if ( sck_rising ) {
+            sdata = (sdata << 1) + gbc->sdo;
+            serial_counter++;
+        }
+
+        prev_sck = gbc->sck_o;
+
+        if ( serial_counter == 8 ) {
+            std::cout << sdata << std::flush;
+            sdata = 0;
+            serial_counter = 0;
+        }
+
         // --- SDL event handling (check every ~456 cycles = one scanline) ---
         if (cycle % 456 == 0) {
             SDL_Event e;
@@ -241,15 +262,16 @@ int main(int argc, char** argv) {
         }
 
         
-        if ( cycle % CYCLE_INTERVAL == 0 ){
-            end = high_resolution_clock::now();
-            duration = duration_cast<microseconds>(end - start);
-            std::cout   << "Decode " << cycle << " time: "
-                        << duration.count()
-                        << " us" << std::endl;
-        }
+        // if ( cycle % CYCLE_INTERVAL == 0 ){
+        //     end = high_resolution_clock::now();
+        //     duration = duration_cast<microseconds>(end - start);
+        //     std::cout   << "Decode " << cycle << " time: "
+        //                 << duration.count()
+        //                 << " us" << std::endl;
+        // }
         cycle++;
     }
+    std::cout << std::endl;
 
     if (cycle >= MAX_CYCLES)
         SDL_Log("Simulation ended: MAX_CYCLES reached");

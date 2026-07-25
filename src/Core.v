@@ -7,6 +7,7 @@ module Core(
     output reg we, re,
     input wire [4:0] intr_req,
     output wire dbl_spd,
+    output reg cpu_en,
     output reg stop
 );
 
@@ -24,7 +25,6 @@ module Core(
 
     reg [1:0] cpu_phase = 0, cpu_phase_n;
     reg last_dot_of_phase;
-    reg cpu_en = 0;
     
     wire sig_writeback, sig_data_sel, sig_readmem;
     wire [3:0] sig_r1, sig_r2, sig_rd, sig_addrh, sig_addrl;
@@ -104,7 +104,7 @@ module Core(
     IDU idu_inst (
         .addr_in( addrbus ),
         .op( sig_idu_op ),
-        .carry( alu_flags[0] ), .sign( alu_in1[7] ),
+        .carry( alu_flags[0] ), .sign( alu_in2[7] ),
         .out( idu_out )
     );
 
@@ -195,8 +195,9 @@ module Core(
                 default: begin
                     if ( addrbus >= 16'hFF80 && addrbus <= 16'hFFFE ) begin
                         databus = hram[addrbus - 16'hFF80];
+                    end else begin
+                        databus = din;
                     end
-                    databus = din;
                     // re = 1;
                 end
             endcase

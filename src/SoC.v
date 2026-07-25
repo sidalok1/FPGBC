@@ -14,14 +14,19 @@ module SoC #(
     output wire hsync, vsync,
     output wire [4:0] r, g, b,
     output wire de,
-    output wire dotclk_en
+    output wire dotclk_en,
+
+    input wire sck_i, sdi,
+    output wire sck_o, sdo
 );
 
     wire [7:0] sig_cpu_din, sig_cpu_dout;
     wire [15:0] sig_cpu_addrbus;
     wire sig_cpu_we, sig_cpu_re ;
+    wire sig_cpu_en;
     wire [4:0] sig_cpu_intr_req;
-    assign sig_cpu_intr_req[4:2] = 0; // to be implemented
+    assign sig_cpu_intr_req[4] = 0; // to be implemented
+    assign sig_cpu_intr_req[2] = 0;
     wire sig_cpu_dbl_spd;
     wire sig_cpu_stop;
 
@@ -31,6 +36,8 @@ module SoC #(
     wire sig_ppu_wout, sig_ppu_rout;
 
     wire [7:0] sig_mac_cpu_din, sig_mac_ppu_din;
+
+    wire [7:0] sig_serial_dout;
 
     ClockDivider #(
         .I_CLK_FRQ(clk_frq),
@@ -48,6 +55,7 @@ module SoC #(
         .we(sig_cpu_we), .re(sig_cpu_re),
         .intr_req(sig_cpu_intr_req),
         .dbl_spd(sig_cpu_dbl_spd),
+        .cpu_en(sig_cpu_en),
         .stop(sig_cpu_stop)
     );
 
@@ -75,7 +83,15 @@ module SoC #(
         .cart_dout(din)
     );
 
-    assign sig_cpu_din = sig_ppu_dout | sig_mac_cpu_din;
+    Serial serial_controller (
+        .clk(clk), .en(sig_cpu_en), .rst(rst),
+        .addr(sig_cpu_addrbus), .din(sig_cpu_dout), .dout(sig_serial_dout),
+        .we(sig_cpu_we), .re(sig_cpu_re), 
+        .sck_i(sck_i), .sck_o(sck_o), .sdi(sdi), .sdo(sdo),
+        .seri_intr(sig_cpu_intr_req[3])
+    );
+
+    assign sig_cpu_din = sig_ppu_dout | sig_mac_cpu_din | sig_serial_dout;
     assign sig_ppu_din = sig_ppu_rout ? sig_mac_ppu_din : sig_cpu_dout;
 
 endmodule

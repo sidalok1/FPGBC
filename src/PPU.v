@@ -77,7 +77,7 @@ module PPU (
     //  |     ?     |     ?     |     ?     |     ?     |     ?     | DMG_MODE  |     ?     |     ?     |
     //  |                                                R                                              |
     // writes lock after first write to BANK
-    reg [7:0] KEY0_reg = 8'h0; // reads return {7'b1, [VRAM BANK NUMBER]}
+    reg [7:0] KEY0_reg = 8'h0;
     reg KEY0_locked = 0;
     wire DMG_mode = KEY0_reg[2];
 
@@ -651,8 +651,8 @@ module PPU (
         else
             STAT_reg[1:0] = current_mode;
 
-        addr_in_is_oam = addr_in >= 16'hFE00 && addr_in <= 16'hFE9F;
-        addr_in_is_vram = addr_in >= 16'h8000 && addr_in <= 16'h9FFF;
+        addr_in_is_oam = (addr_in >= 16'hFE00) && (addr_in <= 16'hFE9F);
+        addr_in_is_vram = (addr_in >= 16'h8000) && (addr_in <= 16'h9FFF);
         // CPU issued writes have lower priority than both ppu and dma. These combinational
         // values can be later overwritten
         if ( wen ) begin
@@ -768,6 +768,7 @@ module PPU (
                             fetch_counter_n = 0;
 
                             win_x_n = 0;
+                            output_x_n = 0;
 
                             fetcher_state_n = fetcher_bgr_map_addr;
                             bgr_fifo_flush_n = 1;
@@ -918,13 +919,14 @@ module PPU (
                 if ( !obj_trigger && !obj_state && output_x < 8 )
                     output_x_n = output_x + 1;
                 else
-                if ( !(obj_trigger || obj_state || bgr_fifo_flush == 1 || bgr_fifo_len == 0) ) begin 
+                if ( !(obj_trigger || obj_state || bgr_fifo_flush || (bgr_fifo_len == 0 && !bgr_fifo_push)) ) begin 
                     // any of these conditions stalls the output
                     // obj_with_priority may get set to 4'hF while data is yet to be pushed to obj_fifo
                     de2_n = output_x < 168 ? 1 : 0;
                     output_x_n = output_x + 1;
                     bgr_fifo_read = 1;
                     if ( OBJ_PRI_MODE == 1 ) begin // DMG mode
+                    // In DMG mode the pallete used might actually be from CRAM? Need to check documentation
                     // Stage 0
                         if ( obj_fifo_len > 0 ) begin
                             obj_fifo_read = 1;
@@ -1010,13 +1012,14 @@ module PPU (
             h_blank: begin
                 if ( INTR_M0_EN )
                     stat_intr = 1;
-                if ( dot_counter >= (456 - 80) ) // hsync high for last 80 dots of hblank
-                    hsync_n = 1;
+                if ( dot_counter >= (456 - 80) ) // hsync low for last 80 dots of hblank
+                    hsync_n = 0;
                 if ( dot_counter == 455 ) begin
                     dot_counter_n = 0;
                     oam_idx_n = 0;
                     oamScan_substate_n = get_y_position;
                     obj_valid_n = 0;
+                    inc_LY = 1;
                     
                     if ( LY_reg == 143 ) begin
                         next_mode = v_blank;
@@ -1030,8 +1033,8 @@ module PPU (
                 if ( INTR_M1_EN )
                     stat_intr = 1;
                 vblank_intr = 1;
-                if ( LY_reg >= (153 - 8) ) // vsync high for last 8 scanlines
-                    vsync_n = 1;
+                if ( LY_reg >= (153 - 8) ) // vsync low for last 8 scanlines
+                    vsync_n = 0;
                 if ( dot_counter == 455 ) begin
                     dot_counter_n = 0;
                     inc_LY = 1;

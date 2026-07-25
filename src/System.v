@@ -1,11 +1,13 @@
 `timescale 1ns/1ps
 `default_nettype none
-`define DEBUG
+// `define DEBUG
 module System (
     input wire clk, rst,
     output wire hsync, vsync, de,
-    output wire [4:0] r, g, b
+    output wire [4:0] r, g, b,
     // input wire done
+    input wire sck_i, sdi,
+    output wire sck_o, sdo
 );
 
     wire [7:0] soc_to_cart_data, cart_to_soc_data;
@@ -25,12 +27,14 @@ module System (
         .write_mem(cart_we), .read_mem(cart_re),
         .hsync(hsync), .vsync(vsync), .de(pix_de),
         .dotclk_en(dotclk),
-        .r(r), .g(g), .b(b)
+        .r(r), .g(g), .b(b),
+        .sck_i(sck_i), .sck_o(sck_o),
+        .sdi(sdi), .sdo(sdo)
     );
 
     MBC #(
         .mbc_type(0),
-        .ROMFILE("roms/asteroids.mem")
+        .ROMFILE("roms/main.mem")
     ) Cartridge (
         .clk(clk), .rst(rst), .en(1'b1),
         .addr(addr_line),

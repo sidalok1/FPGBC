@@ -45,7 +45,7 @@ module MAC(
     reg ppu_addr_in_cart, cpu_addr_in_cart;
 
     initial begin
-        $readmemh("roms/cgb_boot.mem", bootrom);
+        $readmemh("roms/testboot.mem", bootrom);
     end
 
 
@@ -113,6 +113,7 @@ module MAC(
             else begin
                 cart_addr = cpu_addr;
                 cart_we = cpu_we;
+                cart_re = cpu_re;
             end
         end
 

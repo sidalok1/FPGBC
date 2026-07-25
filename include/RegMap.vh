@@ -1,4 +1,8 @@
 // Register Addresses
+
+localparam SB		= 16'hFF01;
+localparam SC		= 16'hFF02;
+
 localparam IF       = 16'hFF0F;
 
 localparam LCDC     = 16'hFF40;

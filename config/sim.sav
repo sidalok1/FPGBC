@@ -1,24 +1,26 @@
 [*]
 [*] GTKWave Analyzer v3.3.116 (w)1999-2023 BSI
-[*] Wed Jul 22 18:07:59 2026
+[*] Sat Jul 25 01:30:15 2026
 [*]
-[dumpfile] "/home/sid/code/SM83/_out/dump.fst"
-[dumpfile_mtime] "Wed Jul 22 17:52:20 2026"
-[dumpfile_size] 1027250
-[savefile] "/home/sid/code/SM83/config/sim.sav"
-[timestart] 125000
-[size] 2560 1440
-[pos] -39 -497
-*-23.100000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[dumpfile] "/home/Code/FPGbA/_out/dump.fst"
+[dumpfile_mtime] "Sat Jul 25 01:29:03 2026"
+[dumpfile_size] 175125
+[savefile] "/home/Code/FPGbA/config/sim.sav"
+[timestart] 309000000
+[size] 1440 960
+[pos] 720934 720955
+*-28.244293 995000000 1318800000000 166125000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] TOP.
 [treeopen] TOP.System.
+[treeopen] TOP.System.Cartridge.
 [treeopen] TOP.System.Gameboy_SOC.
-[treeopen] TOP.System.Gameboy_SOC.cpu_core.
+[treeopen] TOP.System.Gameboy_SOC.cpu_core.regfile.
+[treeopen] TOP.System.Gameboy_SOC.pixel_processing_unit.
 [sst_width] 276
-[signals_width] 142
+[signals_width] 278
 [sst_expanded] 1
-[sst_vpaned_height] 450
-@200
+[sst_vpaned_height] 283
+@c00200
 -PPU
 @28
 TOP.System.Gameboy_SOC.pixel_processing_unit.clk
@@ -45,6 +47,96 @@ TOP.System.Gameboy_SOC.pixel_processing_unit.b[4:0]
 @28
 TOP.System.Gameboy_SOC.pixel_processing_unit.stat_intr
 TOP.System.Gameboy_SOC.pixel_processing_unit.vblank_intr
+TOP.System.Gameboy_SOC.pixel_processing_unit.addr_in_is_vram
+@22
+TOP.System.Gameboy_SOC.pixel_processing_unit.vram_addr[12:0]
+@28
+TOP.System.Gameboy_SOC.pixel_processing_unit.vram0_we
+TOP.System.Gameboy_SOC.pixel_processing_unit.vram1_we
+@2024
+^1 /home/Code/FPGbA/config/ppu_state.filt
+TOP.System.Gameboy_SOC.pixel_processing_unit.current_mode[1:0]
+@24
+TOP.System.Gameboy_SOC.pixel_processing_unit.dot_counter[8:0]
+@200
+-hblank
+-vblank
+-oamscan
+-drawing
+@24
+TOP.System.Gameboy_SOC.pixel_processing_unit.output_x[7:0]
+@22
+TOP.System.Gameboy_SOC.pixel_processing_unit.fetch_counter[7:0]
+@2028
+^2 /home/Code/FPGbA/config/fetcher_state.filt
+TOP.System.Gameboy_SOC.pixel_processing_unit.fetcher_state[8:0]
+@22
+TOP.System.Gameboy_SOC.pixel_processing_unit.map_base[12:0]
+TOP.System.Gameboy_SOC.pixel_processing_unit.tile_x[7:0]
+TOP.System.Gameboy_SOC.pixel_processing_unit.tile_y[7:0]
+TOP.System.Gameboy_SOC.pixel_processing_unit.tile_addr[12:0]
+TOP.System.Gameboy_SOC.pixel_processing_unit.tile_idx[7:0]
+TOP.System.Gameboy_SOC.pixel_processing_unit.tile_attr[7:0]
+@28
+TOP.System.Gameboy_SOC.pixel_processing_unit.bgr_fifo_flush
+TOP.System.Gameboy_SOC.pixel_processing_unit.bgr_fifo_push
+TOP.System.Gameboy_SOC.pixel_processing_unit.bgr_fifo_read
+@22
+TOP.System.Gameboy_SOC.pixel_processing_unit.bgr_fifo_len[3:0]
+TOP.System.Gameboy_SOC.pixel_processing_unit.bgr_fifo.bgr_fifo[0][5:0]
+TOP.System.Gameboy_SOC.pixel_processing_unit.bgr_fifo.bgr_fifo[1][5:0]
+TOP.System.Gameboy_SOC.pixel_processing_unit.bgr_fifo.bgr_fifo[2][5:0]
+TOP.System.Gameboy_SOC.pixel_processing_unit.bgr_fifo.bgr_fifo[3][5:0]
+TOP.System.Gameboy_SOC.pixel_processing_unit.bgr_fifo.bgr_fifo[4][5:0]
+TOP.System.Gameboy_SOC.pixel_processing_unit.bgr_fifo.bgr_fifo[5][5:0]
+TOP.System.Gameboy_SOC.pixel_processing_unit.bgr_fifo.bgr_fifo[6][5:0]
+TOP.System.Gameboy_SOC.pixel_processing_unit.bgr_fifo.bgr_fifo[7][5:0]
+@28
+TOP.System.Gameboy_SOC.pixel_processing_unit.obj_trigger
+TOP.System.Gameboy_SOC.pixel_processing_unit.obj_state
+TOP.System.Gameboy_SOC.pixel_processing_unit.OBJ_PRI_MODE
+@22
+TOP.System.Gameboy_SOC.pixel_processing_unit.mixed_pixel[5:0]
+@200
+-
+@22
+TOP.System.Gameboy_SOC.pixel_processing_unit.STAT_reg[7:0]
+TOP.System.Gameboy_SOC.pixel_processing_unit.LCDC_reg[7:0]
+@28
+TOP.System.Gameboy_SOC.pixel_processing_unit.LCD_EN
+@22
+TOP.System.Gameboy_SOC.pixel_processing_unit.LYC_reg[7:0]
+@24
+TOP.System.Gameboy_SOC.pixel_processing_unit.LY_reg[7:0]
+@c00022
+TOP.System.Gameboy_SOC.pixel_processing_unit.BGP_reg[7:0]
+@28
+(0)TOP.System.Gameboy_SOC.pixel_processing_unit.BGP_reg[7:0]
+(1)TOP.System.Gameboy_SOC.pixel_processing_unit.BGP_reg[7:0]
+(2)TOP.System.Gameboy_SOC.pixel_processing_unit.BGP_reg[7:0]
+(3)TOP.System.Gameboy_SOC.pixel_processing_unit.BGP_reg[7:0]
+(4)TOP.System.Gameboy_SOC.pixel_processing_unit.BGP_reg[7:0]
+(5)TOP.System.Gameboy_SOC.pixel_processing_unit.BGP_reg[7:0]
+(6)TOP.System.Gameboy_SOC.pixel_processing_unit.BGP_reg[7:0]
+(7)TOP.System.Gameboy_SOC.pixel_processing_unit.BGP_reg[7:0]
+@1401200
+-group_end
+@22
+TOP.System.Gameboy_SOC.pixel_processing_unit.BGPI_reg[7:0]
+@28
+TOP.System.Gameboy_SOC.pixel_processing_unit.BG_EN
+TOP.System.Gameboy_SOC.pixel_processing_unit.WIN_EN
+TOP.System.Gameboy_SOC.pixel_processing_unit.WIN_MAP
+@22
+TOP.System.Gameboy_SOC.pixel_processing_unit.WX_reg[7:0]
+TOP.System.Gameboy_SOC.pixel_processing_unit.WY_reg[7:0]
+TOP.System.Gameboy_SOC.pixel_processing_unit.OBP0_reg[7:0]
+TOP.System.Gameboy_SOC.pixel_processing_unit.OBP1_reg[7:0]
+TOP.System.Gameboy_SOC.pixel_processing_unit.OBPI_reg[7:0]
+@28
+TOP.System.Gameboy_SOC.pixel_processing_unit.OBJ_EN
+@1401200
+-PPU
 @200
 -CPU
 @28
@@ -55,22 +147,40 @@ TOP.System.Gameboy_SOC.cpu_core.en
 TOP.System.Gameboy_SOC.cpu_core.din[7:0]
 TOP.System.Gameboy_SOC.cpu_core.dout[7:0]
 TOP.System.Gameboy_SOC.cpu_core.addrbus[15:0]
+TOP.System.Gameboy_SOC.cpu_core.databus[7:0]
 @28
+TOP.System.Gameboy_SOC.cpu_core.cpu_en
 TOP.System.Gameboy_SOC.cpu_core.we
 TOP.System.Gameboy_SOC.cpu_core.re
+TOP.System.Gameboy_SOC.cpu_core.sig_readmem
 @22
 TOP.System.Gameboy_SOC.cpu_core.intr_req[4:0]
 @28
+TOP.System.Gameboy_SOC.cpu_core.controller.IME
 TOP.System.Gameboy_SOC.cpu_core.dbl_spd
 TOP.System.Gameboy_SOC.cpu_core.stop
 @200
 -Control Unit
-@4022
-^>1 /home/sid/code/SM83/gbfilt/target/release/gbfilt
+@c04022
+^>1 /home/Code/FPGbA/gbfilt/target/release/gbfilt
 TOP.System.Gameboy_SOC.cpu_core.controller.IR[7:0]
-@22
+@28
+(0)TOP.System.Gameboy_SOC.cpu_core.controller.IR[7:0]
+(1)TOP.System.Gameboy_SOC.cpu_core.controller.IR[7:0]
+(2)TOP.System.Gameboy_SOC.cpu_core.controller.IR[7:0]
+(3)TOP.System.Gameboy_SOC.cpu_core.controller.IR[7:0]
+(4)TOP.System.Gameboy_SOC.cpu_core.controller.IR[7:0]
+(5)TOP.System.Gameboy_SOC.cpu_core.controller.IR[7:0]
+(6)TOP.System.Gameboy_SOC.cpu_core.controller.IR[7:0]
+(7)TOP.System.Gameboy_SOC.cpu_core.controller.IR[7:0]
+@1401200
+-group_end
+@2022
+^3 /home/Code/FPGbA/config/reg8.filt
 TOP.System.Gameboy_SOC.cpu_core.controller.r1[3:0]
+^3 /home/Code/FPGbA/config/reg8.filt
 TOP.System.Gameboy_SOC.cpu_core.controller.r2[3:0]
+^3 /home/Code/FPGbA/config/reg8.filt
 TOP.System.Gameboy_SOC.cpu_core.controller.rd[3:0]
 @28
 TOP.System.Gameboy_SOC.cpu_core.controller.rd_idu[2:0]
@@ -79,8 +189,117 @@ TOP.System.Gameboy_SOC.cpu_core.controller.data_sel
 TOP.System.Gameboy_SOC.cpu_core.controller.ctr[7:0]
 TOP.System.Gameboy_SOC.cpu_core.controller.addrh[3:0]
 TOP.System.Gameboy_SOC.cpu_core.controller.addrl[3:0]
+@2022
+^4 /home/Code/FPGbA/config/alu.filt
 TOP.System.Gameboy_SOC.cpu_core.controller.alu_op[3:0]
 @28
 TOP.System.Gameboy_SOC.cpu_core.controller.idu_op[1:0]
+@200
+-Register File
+@800022
+#{General Registers} (0)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[0][7:0] (1)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[0][7:0] (2)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[0][7:0] (3)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[0][7:0] (4)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[0][7:0] (5)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[0][7:0] (6)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[0][7:0] (7)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[0][7:0] (0)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[1][7:0] (1)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[1][7:0] (2)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[1][7:0] (3)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[1][7:0] (4)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[1][7:0] (5)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[1][7:0] (6)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[1][7:0] (7)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[1][7:0] (0)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[2][7:0] (1)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[2][7:0] (2)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[2][7:0] (3)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[2][7:0] (4)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[2][7:0] (5)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[2][7:0] (6)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[2][7:0] (7)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[2][7:0] (0)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[3][7:0] (1)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[3][7:0] (2)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[3][7:0] (3)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[3][7:0] (4)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[3][7:0] (5)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[3][7:0] (6)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[3][7:0] (7)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[3][7:0] (0)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[4][7:0] (1)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[4][7:0] (2)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[4][7:0] (3)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[4][7:0] (4)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[4][7:0] (5)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[4][7:0] (6)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[4][7:0] (7)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[4][7:0] (0)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[5][7:0] (1)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[5][7:0] (2)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[5][7:0] (3)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[5][7:0] (4)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[5][7:0] (5)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[5][7:0] (6)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[5][7:0] (7)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[5][7:0] (0)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[6][7:0] (1)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[6][7:0] (2)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[6][7:0] (3)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[6][7:0] (4)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[6][7:0] (5)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[6][7:0] (6)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[6][7:0] (7)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[6][7:0] (0)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[7][7:0] (1)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[7][7:0] (2)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[7][7:0] (3)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[7][7:0] (4)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[7][7:0] (5)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[7][7:0] (6)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[7][7:0] (7)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[7][7:0] (0)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[8][7:0] (1)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[8][7:0] (2)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[8][7:0] (3)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[8][7:0] (4)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[8][7:0] (5)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[8][7:0] (6)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[8][7:0] (7)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[8][7:0] (0)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[9][7:0] (1)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[9][7:0] (2)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[9][7:0] (3)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[9][7:0] (4)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[9][7:0] (5)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[9][7:0] (6)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[9][7:0] (7)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[9][7:0] (0)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[10][7:0] (1)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[10][7:0] (2)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[10][7:0] (3)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[10][7:0] (4)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[10][7:0] (5)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[10][7:0] (6)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[10][7:0] (7)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[10][7:0] (0)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[11][7:0] (1)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[11][7:0] (2)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[11][7:0] (3)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[11][7:0] (4)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[11][7:0] (5)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[11][7:0] (6)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[11][7:0] (7)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[11][7:0] (0)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[12][7:0] (1)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[12][7:0] (2)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[12][7:0] (3)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[12][7:0] (4)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[12][7:0] (5)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[12][7:0] (6)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[12][7:0] (7)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[12][7:0] (0)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[13][7:0] (1)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[13][7:0] (2)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[13][7:0] (3)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[13][7:0] (4)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[13][7:0] (5)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[13][7:0] (6)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[13][7:0] (7)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[13][7:0] (0)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[14][7:0] (1)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[14][7:0] (2)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[14][7:0] (3)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[14][7:0] (4)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[14][7:0] (5)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[14][7:0] (6)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[14][7:0] (7)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[14][7:0] (0)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[15][7:0] (1)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[15][7:0] (2)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[15][7:0] (3)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[15][7:0] (4)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[15][7:0] (5)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[15][7:0] (6)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[15][7:0] (7)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[15][7:0]
+@22
+[color] 1
++{b} TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[0][7:0]
+[color] 2
++{c} TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[1][7:0]
+[color] 3
++{d} TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[2][7:0]
++{e} TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[3][7:0]
+[color] 5
++{h} TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[4][7:0]
+[color] 6
++{l} TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[5][7:0]
+[color] 7
++{a} TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[7][7:0]
+@c00022
+#{pc} (0)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[8][7:0] (1)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[8][7:0] (2)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[8][7:0] (3)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[8][7:0] (4)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[8][7:0] (5)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[8][7:0] (6)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[8][7:0] (7)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[8][7:0] (0)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[9][7:0] (1)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[9][7:0] (2)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[9][7:0] (3)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[9][7:0] (4)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[9][7:0] (5)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[9][7:0] (6)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[9][7:0] (7)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[9][7:0]
+@22
++{pc(h)} TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[8][7:0]
++{pc(l)} TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[9][7:0]
+@1401200
+-group_end
+@c00022
+#{sp} (0)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[10][7:0] (1)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[10][7:0] (2)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[10][7:0] (3)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[10][7:0] (4)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[10][7:0] (5)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[10][7:0] (6)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[10][7:0] (7)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[10][7:0] (0)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[11][7:0] (1)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[11][7:0] (2)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[11][7:0] (3)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[11][7:0] (4)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[11][7:0] (5)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[11][7:0] (6)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[11][7:0] (7)TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[11][7:0]
+@22
++{sp(h)} TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[10][7:0]
++{sp(l)} TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[11][7:0]
+@1401200
+-group_end
+@22
++{w} TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[12][7:0]
++{z} TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[13][7:0]
++{ctr} TOP.System.Gameboy_SOC.cpu_core.regfile.r8.r8[14][7:0]
+@800022
+TOP.System.Gameboy_SOC.cpu_core.cond_check.flags[3:0]
+@28
+(0)TOP.System.Gameboy_SOC.cpu_core.cond_check.flags[3:0]
+(1)TOP.System.Gameboy_SOC.cpu_core.cond_check.flags[3:0]
+(2)TOP.System.Gameboy_SOC.cpu_core.cond_check.flags[3:0]
+(3)TOP.System.Gameboy_SOC.cpu_core.cond_check.flags[3:0]
+@1001200
+-group_end
+@28
+TOP.System.Gameboy_SOC.cpu_core.cond_check.result
+@1001200
+-group_end
+@200
+-Cartridge
+@22
+TOP.System.Cartridge.addr[15:0]
+@28
+TOP.System.Cartridge.en
+TOP.System.Cartridge.clk
+TOP.System.Cartridge.re
+TOP.System.Cartridge.we
+@22
+TOP.System.Cartridge.din[7:0]
+@c00022
+TOP.System.Cartridge.dout[7:0]
+@28
+(0)TOP.System.Cartridge.dout[7:0]
+(1)TOP.System.Cartridge.dout[7:0]
+(2)TOP.System.Cartridge.dout[7:0]
+(3)TOP.System.Cartridge.dout[7:0]
+(4)TOP.System.Cartridge.dout[7:0]
+(5)TOP.System.Cartridge.dout[7:0]
+(6)TOP.System.Cartridge.dout[7:0]
+(7)TOP.System.Cartridge.dout[7:0]
+@1401200
+-group_end
+@200
+-Memory Controller
+@22
+TOP.System.Gameboy_SOC.memory_access_controller.BANK_reg[7:0]
+@28
+TOP.System.Gameboy_SOC.memory_access_controller.BANK_lock
+@22
+TOP.System.Gameboy_SOC.memory_access_controller.bootrom_addr[11:0]
+TOP.System.Gameboy_SOC.memory_access_controller.bootrom_data[7:0]
+TOP.System.Gameboy_SOC.memory_access_controller.cart_addr[15:0]
+TOP.System.Gameboy_SOC.memory_access_controller.cart_din[7:0]
+TOP.System.Gameboy_SOC.memory_access_controller.cart_dout[7:0]
+@28
+TOP.System.Gameboy_SOC.memory_access_controller.cart_re
+TOP.System.Gameboy_SOC.memory_access_controller.cart_we
+TOP.System.Gameboy_SOC.memory_access_controller.cpu_addr_in_cart
+TOP.System.Gameboy_SOC.memory_access_controller.cpu_re
+@200
+-Serial
+@28
+TOP.System.Gameboy_SOC.serial_controller.sck_o
+TOP.System.Gameboy_SOC.serial_controller.sdo
+@29
+TOP.System.Gameboy_SOC.serial_controller.seri_intr
+@28
+TOP.System.Gameboy_SOC.serial_controller.state[2:0]
+@820
+TOP.System.Gameboy_SOC.serial_controller.SB_reg[7:0]
+@22
+TOP.System.Gameboy_SOC.serial_controller.SC_reg[7:0]
+@28
+TOP.System.Gameboy_SOC.serial_controller.TRANSFER_EN
+TOP.System.Gameboy_SOC.serial_controller.divider[6:0]
+TOP.System.Gameboy_SOC.serial_controller.count[2:0]
 [pattern_trace] 1
 [pattern_trace] 0
