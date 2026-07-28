@@ -168,7 +168,7 @@ module ALU ( op, in1, in2, out, flags_in, flags_out );
             endcase
         end
         BIT: begin
-            z = in1[in2[2:0]];
+            z = in1[in2[2:0]] == 0;
             n = 0;
             h = 1;
         end

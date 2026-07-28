@@ -1,7 +1,7 @@
 INCLUDE "hardware.inc"
 
 DEF GBDOC equ 1
-
+ 
 IF DEF(GBDOC)
 SECTION "Boot", ROM0[$000]
 

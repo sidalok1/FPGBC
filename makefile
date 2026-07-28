@@ -1,10 +1,11 @@
 BUILD_DIR := build
+BUILD_TYPE:=Release
 .PHONY: all configure build run clean sim
 
 all: build
 
 configure: ./CMakeLists.txt
-	cmake -B $(BUILD_DIR) -DCMAKE_BUILD_TYPE=Debug
+	cmake -B $(BUILD_DIR) -DCMAKE_BUILD_TYPE=$(BUILD_TYPE)
 
 build: configure
 	cmake --build $(BUILD_DIR) -j$(shell nproc)

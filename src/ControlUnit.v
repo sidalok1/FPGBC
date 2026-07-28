@@ -13,7 +13,7 @@ module ControlUnit(
         rd_idu,
         read,
         write,
-        alu_op, flag_mask, idu_op, load_flags,
+        alu_op, flag_mask, idu_op, load_flags, clear_flags,
         cc, cc_true,
         wake,
         stop,
@@ -44,6 +44,7 @@ module ControlUnit(
     output reg  [7:0]   ack_IF = 0;
     input wire          cc_true;
     output reg load_flags;
+    output reg [3:0] clear_flags;
 
     reg [7:0] IR;
     reg fetch = 1;
@@ -199,6 +200,7 @@ module ControlUnit(
         stop = 0;
         halt = 0;
         load_flags = 0;
+        clear_flags = 4'b0;
         
 
         // begin state logic
@@ -658,9 +660,9 @@ module ControlUnit(
                 r2 = Z;
                 rd = Z;
                 idu_op = ADJ;
-                addrl = PCH;
-                addrh = CTR;
-                rd_idu = _W;
+                addrh = PCH;
+                addrl = CTR;
+                rd_idu = W_;
                 ctr = 8'b0;
             end
             S2: begin
@@ -699,9 +701,9 @@ module ControlUnit(
                 r2 = Z;
                 rd = Z;
                 idu_op = ADJ;
-                addrl = PCH;
-                addrh = CTR;
-                rd_idu = _W;
+                addrh = PCH;
+                addrl = CTR;
+                rd_idu = W_;
                 ctr = 8'b0;
             end
             S3: begin
@@ -1341,14 +1343,21 @@ module ControlUnit(
                 rd = SPL;
                 r1 = SPL;
                 r2 = Z;
+                flag_mask = ALLFLAG;
                 next = S2;
             end
             S2: begin
-                data_sel = ALU;
-                alu_op = ADC;
-                rd = SPH;
-                r1 = SPH;
-                r2 = CTR;
+                // data_sel = ALU;
+                // alu_op = ADC;
+                // rd = SPH;
+                // r1 = SPH;
+                // r2 = CTR;
+                r2 = Z; // so IDU knows if operand was signed
+                idu_op = ADJ;
+                addrh = SPH;
+                addrl = SPL;
+                rd_idu = SP;
+                clear_flags = ZFLAG[3:0] | NFLAG[3:0];
                 ctr = 8'h00;
                 next = S3;
             end
@@ -1360,7 +1369,7 @@ module ControlUnit(
             endcase
         end
         'b11_111_000: begin
-            `executing("ld hl, dp + imm8")
+            `executing("ld hl, sp + imm8")
             case ( state )
             S0: begin
                 data_sel = DIN;
@@ -1371,18 +1380,23 @@ module ControlUnit(
             end
             S1: begin
                 data_sel = ALU;
+                flag_mask = HFLAG | CFLAG;
                 alu_op = ADD;
                 rd = L;
                 r1 = SPL;
                 r2 = Z;
+                idu_op = ADJ;
+                addrh = SPH;
+                addrl = SPL;
+                rd_idu = WZ;
+                next = S2;
             end
             S2: begin
                 data_sel = ALU;
-                alu_op = ADC;
+                clear_flags = ZFLAG[3:0] | NFLAG[3:0];
+                alu_op = PAS;
                 rd = H;
-                r1 = SPH;
-                r2 = CTR;
-                ctr = 8'h00;
+                r1 = W;
                 rd_idu = PC;
                 fetch = 1;
             end

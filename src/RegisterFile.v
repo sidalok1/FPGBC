@@ -1,7 +1,7 @@
 `default_nettype none
 module RegisterFile ( 
     clk, en, rst,
-    rd, din, flags_in, mask, flags_out, load_flags,
+    rd, din, flags_in, mask, flags_out, load_flags, clear_flags,
     r1, r2, ctr, alu1, alu2,
     addr, addrh, addrl, idu, rd_idu
     );
@@ -17,6 +17,7 @@ module RegisterFile (
     input wire  [3:0]   flags_in;
     output wire [3:0]   flags_out;
     input wire          load_flags;
+    input wire  [3:0]   clear_flags;
     input wire  [4:0]   mask;
 
     input wire  [3:0]   r1, r2, addrh, addrl;
@@ -60,6 +61,19 @@ module RegisterFile (
     always @* begin
         for ( i = 0; i < 16; i = i + 1 )
             r8_n[i] = r8[i];
+        
+        case ( rd_idu )
+        BC: {r8_n[B], r8_n[C]} = idu;
+        DE: {r8_n[D], r8_n[E]} = idu;
+        HL: {r8_n[H], r8_n[L]} = idu;
+        SP: {r8_n[SPH], r8_n[SPL]} = idu;
+        PC: {r8_n[PCH], r8_n[PCL]} = idu;
+        WZ: {r8_n[W], r8_n[Z]} = idu;
+        W_: r8_n[W] = idu[15:8];
+        FF:; // garbage writes
+        default:; // all cases captured
+        endcase
+        // rd takes precedence over rd_idu, though this should never happen
         case ( rd )
         B, C, D, E, H,
         L, A, PCH, PCL,
@@ -73,19 +87,9 @@ module RegisterFile (
         end
         else if ( mask[4] ) begin
             r8_n[F][7:4] = (flags_in & mask[3:0]) | (r8[F][7:4] & ~mask[3:0]);
+        end else begin
+            r8_n[F][7:4] = r8[F][7:4] & ~clear_flags;
         end
-
-        case ( rd_idu )
-        BC: {r8_n[B], r8_n[C]} = idu;
-        DE: {r8_n[D], r8_n[E]} = idu;
-        HL: {r8_n[H], r8_n[L]} = idu;
-        SP: {r8_n[SPH], r8_n[SPL]} = idu;
-        PC: {r8_n[PCH], r8_n[PCL]} = idu;
-        WZ: {r8_n[W], r8_n[Z]} = idu;
-        _W: r8_n[W] = idu[7:0];
-        FF:; // garbage writes
-        default:; // all cases captured
-        endcase
     end
 
 endmodule

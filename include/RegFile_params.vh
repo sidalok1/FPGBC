@@ -25,5 +25,5 @@ localparam  BC = 0,
             SP = 3,
             PC = 4,
             WZ = 5,
-            _W = 6,
+            W_ = 6,
             FF = 7;

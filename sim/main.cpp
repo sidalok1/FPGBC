@@ -22,11 +22,13 @@
 #include <cstdint>
 // #include <cstdio>
 #include <iostream>
+#include <iomanip>
 #include <chrono>
+#include <fstream>
 using namespace std::chrono;
 #include <memory>
 
-#define GBDOC_FILE "gbdoc.log"
+// #define GBDOC_FILE "gbdoc.log"
 
 // -------------------------------------------------------------------------
 // Display constants
@@ -39,7 +41,7 @@ static constexpr int GBC_H       = 144;   // GBC visible lines
 
 // How many master-clock cycles to simulate before giving up if no frame arrives
 static constexpr uint64_t GB_SEC = 4e6;
-static constexpr uint64_t MAX_CYCLES = GB_SEC * 4;
+static constexpr uint64_t MAX_CYCLES = GB_SEC * 40;
 static constexpr uint64_t CYCLE_INTERVAL = long(1e7);
 static constexpr int clk_period_half = int(((1/4e6)*1e12)/2);
 
@@ -83,7 +85,8 @@ int main(int argc, char** argv) {
     #define PHASE gbc->rootp->System__DOT__Gameboy_SOC__DOT__cpu_core__DOT__cpu_phase
     #define FETCH gbc->rootp->System__DOT__Gameboy_SOC__DOT__cpu_core__DOT__controller__DOT__fetch
     #define INSTR gbc->rootp->System__DOT__Gameboy_SOC__DOT__cpu_core__DOT__controller__DOT__IR
-    FILE* gbdoc_f = fopen(GBDOC_FILE, "w");
+    std::ofstream gbdoc_fstream(GBDOC_FILE);
+    gbdoc_fstream << std::hex << std::setfill('0') << std::uppercase;
     #endif
     // --- SDL3 setup --------------------------------------------------------
     if (!SDL_Init(SDL_INIT_VIDEO)) {
@@ -175,7 +178,7 @@ int main(int argc, char** argv) {
     uint64_t cycle = 0;
     std::cout << std::endl;
     int pixels_on_line = 0;
-    int frame = 0;
+    uint64_t frame = 0;
     bool prefixed = false;
     while (running && cycle < MAX_CYCLES) {
     // while (running) {
@@ -229,12 +232,23 @@ int main(int argc, char** argv) {
             }
             uint8_t instruction = PCMEM0;
             if ( !prefixed ) { // prefix
-                fprintf(gbdoc_f, "A:%02X F:%02X B:%02X C:%02X D:%02X E:%02X H:%02X L:%02X SP:%04X PC:%04X PCMEM:%02X,%02X,%02X,%02X CYCLE:%f\n",
-                    REG_A, REG_F, REG_B, REG_C, REG_D, REG_E, REG_H, REG_L, SP, ADDRB,
-                    PCMEM0, PCMEM1, PCMEM2, PCMEM3, seconds
-                );
+                gbdoc_fstream << "A:" << std::setw(2) << (int)REG_A << " F:" << std::setw(2) << (int)REG_F << 
+                                " B:" << std::setw(2) << (int)REG_B << " C:" << std::setw(2) << (int)REG_C <<
+                                " D:" << std::setw(2) << (int)REG_D << " E:" << std::setw(2) << (int)REG_E <<
+                                " H:" << std::setw(2) << (int)REG_H << " L:" << std::setw(2) << (int)REG_L <<
+                                " SP:" << std::setw(4) << SP    << " PC:" << std::setw(4) << (int)ADDRB <<
+                                " PCMEM:" << 
+                                std::setw(2) << PCMEM0 << "," << 
+                                std::setw(2) << PCMEM1 << "," << 
+                                std::setw(2) << PCMEM2 << "," << 
+                                std::setw(2) << PCMEM3 <<
+                                " TIME: " << (float)ctx->time() << std::endl; 
+                // fprintf(gbdoc_f, "A:%02X F:%02X B:%02X C:%02X D:%02X E:%02X H:%02X L:%02X SP:%04X PC:%04X PCMEM:%02X,%02X,%02X,%02X CYCLE:%f\n",
+                //     REG_A, REG_F, REG_B, REG_C, REG_D, REG_E, REG_H, REG_L, SP, ADDRB,
+                //     PCMEM0, PCMEM1, PCMEM2, PCMEM3, seconds
+                // );
             }
-            if ( instruction == 0xCB ) {
+            if ( instruction == 0xCB && !prefixed ) { // SET 1 E has opcode 0xCB
                 prefixed = true;
             }
             else {
@@ -252,7 +266,7 @@ int main(int argc, char** argv) {
         //                 << " us" << std::endl;            
         //     start = high_resolution_clock::now();
         // }
-        ctx->timeInc(clk_period_half);
+        ctx->timeInc(clk_period_half); seconds += 1/4e6;
 
         // --- Decode outputs on the rising edge -------------------------
         
@@ -378,7 +392,8 @@ int main(int argc, char** argv) {
     std::cout << std::endl;
 
     #ifdef GBDOC_FILE
-    fclose(gbdoc_f);
+    // fclose(gbdoc_f);
+    gbdoc_fstream.close();
     #endif
 
     if (cycle >= MAX_CYCLES){

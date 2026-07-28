@@ -19,8 +19,8 @@ module IDU(
         INC: out = addr_in + 1;
         DEC: out = addr_in - 1;
         ADJ: out = 
-            (carry & ~sign) ? addr_in + 1 :
-            (~carry & sign) ? addr_in - 1 :
+            (carry & ~sign) ? addr_in + (1 << 8) :
+            (~carry & sign) ? addr_in - (1 << 8) :
                               addr_in;
         default: out = addr_in;
         endcase
