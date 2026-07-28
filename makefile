@@ -4,15 +4,15 @@ BUILD_DIR := build
 all: build
 
 configure: ./CMakeLists.txt
-	cmake -B $(BUILD_DIR) -DCMAKE_BUILD_TYPE=Release
+	cmake -B $(BUILD_DIR) -DCMAKE_BUILD_TYPE=Debug
 
 build: configure
 	cmake --build $(BUILD_DIR) -j$(shell nproc)
 
 roms/main.mem: src/main.asm
-	rgbasm -o _out/main.o src/main.asm -I include
-	rgblink -o _out/main.gb _out/main.o
-	python3 bintoascii.py _out/main.gb -o roms/main.mem
+# 	rgbasm -o _out/main.o src/main.asm -I include
+# 	rgblink -o _out/main.gb _out/main.o
+# 	python3 bintoascii.py _out/main.gb -o roms/main.mem
 
 roms/testboot.mem: src/boot.asm
 	rgbasm -o _out/boot.o src/boot.asm -I include

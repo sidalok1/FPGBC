@@ -117,8 +117,8 @@ module PPU (
     reg vram0_we, vram1_we;
     reg [12:0] vram_addr;
     reg [7:0] vram_din;
-    reg [7:0] vram0_dout = vram_bank_0[vram_addr];
-    reg [7:0] vram1_dout = vram_bank_1[vram_addr];
+    wire [7:0] vram0_dout = vram_bank_0[vram_addr];
+    wire [7:0] vram1_dout = vram_bank_1[vram_addr];
     reg addr_in_is_vram;
     reg [7:0] OAM [0:159];
     reg oam_we;
@@ -256,17 +256,17 @@ module PPU (
         reg [4:0] r_n, g_n, b_n;
         reg de2 = 0, de2_n, de1 = 0, de0 = 0;
 
-        wire [7:0] DMG_RGB [0:9];
-        assign DMG_RGB[0] = {3'b000, 5'b11000}; // white
-        assign DMG_RGB[1] = {1'b0, 5'b11000, 2'b11};
-        assign DMG_RGB[2] = {3'b000, 5'b10000}; // light gray
-        assign DMG_RGB[3] = {1'b0, 5'b10000, 2'b10};
-        assign DMG_RGB[4] = {3'b000, 5'b01000}; // dark gray
-        assign DMG_RGB[5] = {1'b0, 5'b01000, 2'b01};
-        assign DMG_RGB[6] = {3'b000, 5'b00000}; // black
-        assign DMG_RGB[7] = {1'b0, 5'b00000, 2'b00};
-        assign DMG_RGB[8] = 8'hFF; // blank
-        assign DMG_RGB[9] = 8'hFF;
+        // wire [7:0] DMG_RGB [0:9];
+        // assign DMG_RGB[0] = {3'b000, 5'b11000}; // white
+        // assign DMG_RGB[1] = {1'b0, 5'b11000, 2'b11};
+        // assign DMG_RGB[2] = {3'b000, 5'b10000}; // light gray
+        // assign DMG_RGB[3] = {1'b0, 5'b10000, 2'b10};
+        // assign DMG_RGB[4] = {3'b000, 5'b01000}; // dark gray
+        // assign DMG_RGB[5] = {1'b0, 5'b01000, 2'b01};
+        // assign DMG_RGB[6] = {3'b000, 5'b00000}; // black
+        // assign DMG_RGB[7] = {1'b0, 5'b00000, 2'b00};
+        // assign DMG_RGB[8] = 8'hFF; // blank
+        // assign DMG_RGB[9] = 8'hFF;
 
         reg [7:0] BGP_RGB [0:63];
         reg [7:0] OBP_RGB [0:63];
@@ -685,10 +685,11 @@ module PPU (
 
         
         data_base = (TILE_SEL == 0) ? 13'h1000 : 13'h0000;
-        tile_base = (TILE_SEL == 0) ? data_base - 13'(tile_idx) : data_base + 13'(tile_idx);
+        tile_base = (TILE_SEL == 0) ?   $signed(data_base) + (13'($signed(tile_idx)) * 16) : 
+                                        data_base + (13'(tile_idx) * 16);
         if ( bgr_state ) begin
             map_base = (BG_MAP == 0) ? 13'h1800 : 13'h1C00;
-            pix_x = fetch_counter + SCX_reg;
+            pix_x = (fetch_counter*8) + SCX_reg;
             pix_y = LY_reg + SCY_reg;
         end
         else 
@@ -765,7 +766,7 @@ module PPU (
                         if ( dot_counter == 79 ) begin // 80th dot
                             next_mode = drawing;
 
-                            fetch_counter_n = 0;
+                            fetch_counter_n = 1;
 
                             win_x_n = 0;
                             output_x_n = 0;
@@ -818,10 +819,10 @@ module PPU (
                             bgr_fifo_push = 1;
                             
                             fetcher_state_n = (bgr_state) ? fetcher_bgr_map_addr : fetcher_win_map_addr;
-                            if ( bgr_state )
-                                fetch_counter_n = fetch_counter + 8;
-                            else if ( win_state )
-                                win_x_n = win_x + 8;
+                            // if ( bgr_state )
+                            //     fetch_counter_n = fetch_counter + 8;
+                            // else if ( win_state )
+                            //     win_x_n = win_x + 8;
                             fetch_counter_n = fetch_counter + 1;
                         end
                         if ( obj_trigger ) begin // there is valid object to be fetched
@@ -857,7 +858,7 @@ module PPU (
                         obj_valid_n[current_obj] = 0;
                         for ( i = 0; i < 8; i = i + 1 ) begin
                             if ( obj_attr[5] == 1 ) begin
-                                if ( !DMG_mode ) begin
+                                if ( !OBJ_PRI_MODE ) begin
                                     // transparent pixel OR new object has lower oam idx
                                     obj_fifo_merge_n[i] = (obj_fifo[i][5:4] == 2'b0 || obj_addr[5:0] < obj_fifo[i][11:6]) ? 
                                         1 : 0;
@@ -867,7 +868,7 @@ module PPU (
                                 end
                             end
                             else begin
-                                if ( !DMG_mode ) begin
+                                if ( !OBJ_PRI_MODE ) begin
                                     // transparent pixel OR new object has lower oam idx
                                     obj_fifo_merge_n[7-i] = (obj_fifo[7-i][5:4] == 2'b0 || obj_addr[5:0] < obj_fifo[7-i][11:6]) ? 
                                         1 : 0;
@@ -925,50 +926,37 @@ module PPU (
                     de2_n = output_x < 168 ? 1 : 0;
                     output_x_n = output_x + 1;
                     bgr_fifo_read = 1;
-                    if ( OBJ_PRI_MODE == 1 ) begin // DMG mode
-                    // In DMG mode the pallete used might actually be from CRAM? Need to check documentation
+                    
                     // Stage 0
+                    if ( DMG_mode ) begin
+                    // In DMG mode the pallete used might actually be from CRAM? Need to check documentation
                         if ( obj_fifo_len > 0 ) begin
                             obj_fifo_read = 1;
                             if ( BG_EN == 1 ) begin
                                 if ( obj_pix_idx == 0 || obj_pix_pri == 1 )
-                                    mixed_pixel_n = {bgr_pix_idx, 3'b000, 1'b0}; // bgr_pix_pal == 3'd0 means non-blank pixel
+                                    mixed_pixel0_n = {BGP_reg[2*bgr_pix_idx +:2], 3'b000, 1'b0}; // bgr_pix_pal == 3'd0 means non-blank pixel
                                 else
-                                    mixed_pixel_n = {obj_pix_idx, obj_pix_pal, 1'b1};
+                                    if ( obj_pix_pal == 0 )
+                                        mixed_pixel0_n = {OBP0_reg[2*obj_pix_idx +:2], obj_pix_pal, 1'b1};
+                                    else
+                                        mixed_pixel0_n = {OBP1_reg[2*obj_pix_idx +:2], obj_pix_pal, 1'b1};
                             end
                             else begin
                                 if ( obj_pix_idx == 0 )
-                                    mixed_pixel_n = {bgr_pix_idx, 3'b001, 1'b0}; // blank pixel symbolized by bgr_pix_pal 3'd1
+                                    mixed_pixel0_n = {BGP_reg[2*bgr_pix_idx +:2], 3'b001, 1'b0}; // blank pixel symbolized by bgr_pix_pal 3'd1
                                 else
-                                    mixed_pixel_n = {obj_pix_idx, obj_pix_pal, 1'b1};
+                                    if ( obj_pix_pal == 0 )
+                                        mixed_pixel0_n = {OBP0_reg[2*obj_pix_idx +:2], obj_pix_pal, 1'b1};
+                                    else
+                                        mixed_pixel0_n = {OBP1_reg[2*obj_pix_idx +:2], obj_pix_pal, 1'b1};
                             end
                         end
                         else begin
-                            mixed_pixel_n = {bgr_pix_idx, 3'b000, 1'b0};
+                            mixed_pixel0_n = {BGP_reg[2*bgr_pix_idx +:2], 3'b000, 1'b0};
                         end
-                    // Stage 1
-                        if ( mixed_pixel[0] == 0 ) begin // background/window
-                            if ( mixed_pixel[1] == 1 ) begin // blank pixel
-                                pallet_idx_n = 4'd8;
-                            end
-                            else begin
-                                pallet_idx_n = {1'b0, BGP_reg[2*mixed_pixel[5:4] +:2], 1'b0}; // BGP ID * 2
-                            end
-                        end
-                        else begin
-                            if ( mixed_pixel[1] == 1 ) begin
-                                pallet_idx_n = {1'b0, OBP1_reg[2*mixed_pixel[5:4] +:2], 1'b0};
-                            end
-                            else begin
-                                pallet_idx_n = {1'b0, OBP0_reg[2*mixed_pixel[5:4] +:2], 1'b0};
-                            end
-                        end
-                    // Stage 2
-                        rgb_low_n = DMG_RGB[pallet_idx];
-                        rgb_high_n = DMG_RGB[pallet_idx+1];
                     end
-                    else begin // CGB_mode
-                    // Stage 0
+                    else 
+                    begin // CGB_mode
                         if ( obj_fifo_len > 0 ) begin
                             obj_fifo_read = 1;
                             if ( BG_EN == 1 ) begin
@@ -986,19 +974,20 @@ module PPU (
                         end else begin
                             mixed_pixel0_n = {bgr_pix_idx, bgr_pix_pal, 1'b0};
                         end
-                    // Stage 1
-                        mixed_pixel_n = mixed_pixel0;
-                        if ( mixed_pixel0[0] == 0 )
-                            rgb_low0_n = BGP_RGB[{mixed_pixel0[3:1], mixed_pixel0[5:4], 1'b0}];
-                        else
-                            rgb_low0_n = OBP_RGB[{mixed_pixel0[3:1], mixed_pixel0[5:4], 1'b0}];
-                    // Stage 2
-                        rgb_low_n = rgb_low0;
-                        if ( mixed_pixel[0] == 0 )
-                            rgb_high_n = BGP_RGB[{mixed_pixel[3:1], mixed_pixel[5:4], 1'b1}];
-                        else
-                            rgb_high_n = OBP_RGB[{mixed_pixel[3:1], mixed_pixel[5:4], 1'b1}];
                     end
+                    // Stage 1
+                    mixed_pixel_n = mixed_pixel0;
+                    if ( mixed_pixel0[0] == 0 )
+                        rgb_low0_n = BGP_RGB[{mixed_pixel0[3:1], mixed_pixel0[5:4], 1'b0}];
+                    else
+                        rgb_low0_n = OBP_RGB[{mixed_pixel0[3:1], mixed_pixel0[5:4], 1'b0}];
+                    // Stage 2
+                    rgb_low_n = rgb_low0;
+                    if ( mixed_pixel[0] == 0 )
+                        rgb_high_n = BGP_RGB[{mixed_pixel[3:1], mixed_pixel[5:4], 1'b1}];
+                    else
+                        rgb_high_n = OBP_RGB[{mixed_pixel[3:1], mixed_pixel[5:4], 1'b1}];
+                    // end
                     // Stage 3
                     r_n = rgb_low[4:0];
                     g_n = {rgb_high[1:0], rgb_low[7:5]};
@@ -1010,10 +999,9 @@ module PPU (
                 end
             end
             h_blank: begin
+                hsync_n = 0;
                 if ( INTR_M0_EN )
                     stat_intr = 1;
-                if ( dot_counter >= (456 - 80) ) // hsync low for last 80 dots of hblank
-                    hsync_n = 0;
                 if ( dot_counter == 455 ) begin
                     dot_counter_n = 0;
                     oam_idx_n = 0;
@@ -1030,11 +1018,10 @@ module PPU (
                 end
             end
             v_blank: begin
+                vsync_n = 0;
                 if ( INTR_M1_EN )
                     stat_intr = 1;
                 vblank_intr = 1;
-                if ( LY_reg >= (153 - 8) ) // vsync low for last 8 scanlines
-                    vsync_n = 0;
                 if ( dot_counter == 455 ) begin
                     dot_counter_n = 0;
                     inc_LY = 1;
@@ -1087,7 +1074,8 @@ module PPU (
                 STAT:   data_out = STAT_reg;
                 SCY:    data_out = SCY_reg;
                 SCX:    data_out = SCX_reg;
-                LY:     data_out = LY_reg;
+                // LY:     data_out = LY_reg;
+                LY:     data_out = 8'h90;
                 LYC:    data_out = LYC_reg;
                 DMA:    data_out = DMA_reg;
                 BGP:    data_out = BGP_reg;

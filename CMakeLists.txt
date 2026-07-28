@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.20)
 cmake_policy(SET CMP0144 NEW)
 project(gbc_sim CXX)
 
-set(CMAKE_CXX_STANDARD 17)
+# set(CMAKE_CXX_STANDARD 20)
 
 
 # ---------------------------------------------------------------------------
@@ -55,9 +55,10 @@ set(HDL_SOURCES
 verilate(gbc_sim
     SOURCES       ${HDL_SOURCES}
     VERILATOR_ARGS
-        -O3 --x-assign fast --x-initial fast --no-assert
+        --x-assign fast --x-initial fast --no-assert
         -y "include"
         -y "roms" 
+        # --threads 1
         -Wall 
         -Wno-EOFNEWLINE
         -Wno-UNUSED
@@ -65,15 +66,24 @@ verilate(gbc_sim
         -Wno-PROCASSINIT
         -Wno-WIDTHTRUNC
         --report-unoptflat
-        --prof-cfuncs
+        # --prof-cfuncs
         # --prof-exec
+        --trace-max-array 0
+        # --trace-max-width 0
+        -CFLAGS "-ggdb -O3"
+        -LDFLAGS "-ggdb"
+        # --valgrind
+        # --gdb
+        # --gdbbt
+        # --runtime-debug
+        # -no-decoration
     OPT_FAST      "-O3 -march=native"
     TOP_MODULE    System
     TRACE_FST
     PREFIX        Vgbc
 )
 # Target compile and link profiling options
-target_compile_options(gbc_sim PRIVATE -pg)
-target_link_options(gbc_sim PRIVATE -pg)
+# target_compile_options(gbc_sim PRIVATE -pg)
+# target_link_options(gbc_sim PRIVATE -pg)
 
 target_link_libraries(gbc_sim PRIVATE ${SDL3_TARGET})

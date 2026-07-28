@@ -27,6 +27,7 @@ module Core(
     reg last_dot_of_phase;
     
     wire sig_writeback, sig_data_sel, sig_readmem;
+    wire sig_load_flags;
     wire [3:0] sig_r1, sig_r2, sig_rd, sig_addrh, sig_addrl;
     wire [4:0] sig_flag_mask;
     wire [ALU_OPWIDTH:0] sig_alu_op;
@@ -78,7 +79,7 @@ module Core(
         .addrh( sig_addrh ), .addrl( sig_addrl ),
         .read( sig_readmem ),
         .write( sig_writeback ),
-        .alu_op( sig_alu_op ), .flag_mask( sig_flag_mask ),
+        .alu_op( sig_alu_op ), .flag_mask( sig_flag_mask ), .load_flags( sig_load_flags ),
         .idu_op( sig_idu_op ),
         .cc( cc ), .cc_true( cc_result ),
         .wake( sig_wake ),
@@ -92,7 +93,8 @@ module Core(
         .alu1( alu_in1 ), .alu2( alu_in2 ),
         .din( reg_din ), .flags_in( alu_flags ), .flags_out( saved_flags ), .mask(sig_flag_mask),
         .ctr( ctr_data ),
-        .idu( idu_out )
+        .idu( idu_out ),
+        .load_flags( sig_load_flags )
     );
     
     ALU alu_inst (

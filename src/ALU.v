@@ -26,6 +26,7 @@ module ALU ( op, in1, in2, out, flags_in, flags_out );
     assign daa_offsets[1] = 8'h06;
     assign daa_offsets[2] = 8'h60;
     assign daa_offsets[3] = 8'h66;
+    reg [7:0] adjustment, half_adj, carry_adj;
     
     assign daa_off_l = (subtract == 0 && in1[3:0] > 'h09) || half;
     assign daa_off_h = (subtract == 0 && in1 > 'h99) || carry;
@@ -46,6 +47,9 @@ module ALU ( op, in1, in2, out, flags_in, flags_out );
         c = carry;
         full_result = 0;
         half_result = 0;
+        adjustment = 0;
+        half_adj = 0;
+        carry_adj = 0;
 
         case (op) 
         PAS: full_result[7:0] = in1;
@@ -99,7 +103,7 @@ module ALU ( op, in1, in2, out, flags_in, flags_out );
             full_result = {1'b0, in1 | in2};
             z = full_result == 0;
             n = 0;
-            h = 1;
+            h = 0;
             c = 0;
         end
         SHR: begin
@@ -190,10 +194,21 @@ module ALU ( op, in1, in2, out, flags_in, flags_out );
             h = 0;
         end
         DAA: begin
-            full_result = (subtract) ? in1 - offset : in1 + offset;
+            if ( subtract ) begin
+                half_adj = (half) ? 8'h06 : 8'h00;
+                carry_adj = (carry) ? 8'h60 : 8'h00;
+                adjustment = half_adj + carry_adj;
+                full_result = in1 - adjustment;
+            end
+            else begin
+                half_adj = (half == 1 || in1[3:0] > 4'h09) ? 8'h06 : 8'h00;
+                carry_adj = (carry == 1 || in1 > 8'h99) ? 8'h60 : 8'h00;
+                c = (carry == 1 || in1 > 8'h99) ? 1 : carry;
+                adjustment = half_adj + carry_adj;
+                full_result = in1 + adjustment;
+            end
             z = full_result[7:0] == 0;
             h = 0;
-            c = full_result > 'h99 || carry;
         end
         default:; // All cases captured
         endcase

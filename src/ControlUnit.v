@@ -13,7 +13,7 @@ module ControlUnit(
         rd_idu,
         read,
         write,
-        alu_op, flag_mask, idu_op,
+        alu_op, flag_mask, idu_op, load_flags,
         cc, cc_true,
         wake,
         stop,
@@ -43,6 +43,7 @@ module ControlUnit(
     output reg  [1:0]   cc;
     output reg  [7:0]   ack_IF = 0;
     input wire          cc_true;
+    output reg load_flags;
 
     reg [7:0] IR;
     reg fetch = 1;
@@ -197,7 +198,7 @@ module ControlUnit(
         ack_IF = 0;
         stop = 0;
         halt = 0;
-
+        load_flags = 0;
         
 
         // begin state logic
@@ -266,6 +267,7 @@ module ControlUnit(
                     r2 = CTR;
                     ctr = {5'b0, IR[5:3]};
                     alu_op = {2'b10, IR[7:6]};
+                    data_sel = ALU;
                     flag_mask = ALLFLAG;
                     rd_idu = PC;
                     fetch = 1;
@@ -820,7 +822,7 @@ module ControlUnit(
                 data_sel = DIN;
                 read_from_mem = 1;
                 rd = Z;
-                next = S1;
+                next = S2;
             end
             S2: begin
                 addrh = SPH;
@@ -829,14 +831,14 @@ module ControlUnit(
                 data_sel = DIN;
                 read_from_mem = 1;
                 rd = W;
-                next = S2;
+                next = S3;
             end
             S3: begin
                 addrh = W;
                 addrl = Z;
                 idu_op = ZER;
                 rd_idu = PC;
-                next = S3;
+                next = S4;
             end
             S4: begin
                 rd_idu = PC;
@@ -902,7 +904,10 @@ module ControlUnit(
             S0: begin
                 addrh = SPH;
                 addrl = SPL;
-                rd = LSBs[IR[5:4]];
+                if ( IR[5:4] == 2'b11 ) // pop AF
+                    load_flags = 1;
+                else
+                    rd = LSBs[IR[5:4]];
                 data_sel = DIN;
                 read_from_mem = 1;
                 rd_idu = SP;
@@ -1154,13 +1159,13 @@ module ControlUnit(
             end
             S1: begin
                 r1 = A;
-                r2 = {1'b0, IR[2:0]};
+                r2 = Z;
                 data_sel = ALU; 
-                if ( IR[5:3] == 'b111 ) begin
+                if ( IR[5:3] == 'b111 ) begin // compare ( discard result )
                     alu_op = SUB;
                 end else begin
-                    alu_op = {2'b00, IR[5:3]};
                     rd = A; 
+                    alu_op = {2'b00, IR[5:3]};
                 end
                 flag_mask = ALLFLAG;
                 rd_idu = PC;
@@ -1207,6 +1212,7 @@ module ControlUnit(
             S1: begin
                 addrh = CTR;
                 ctr = 8'hFF;
+                addrl = Z;
                 data_sel = DIN;
                 read_from_mem = 1;
                 rd = A;

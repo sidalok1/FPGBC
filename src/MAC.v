@@ -87,7 +87,8 @@ module MAC(
         cpu_din = 8'h00;
         ppu_din = 8'h00;
 
-        cpu_addr_in_bootrom =   (cpu_addr >= 16'h0000 && cpu_addr <= 16'h08FF);
+        cpu_addr_in_bootrom =   (cpu_addr >= 16'h0000 && cpu_addr <= 16'h00FF) ||
+                                (cpu_addr >= 16'h0200 && cpu_addr <= 16'h08FF);
         cpu_addr_in_wram = cpu_addr >= 16'hC000 && cpu_addr <= 16'hCFFF;
         ppu_addr_in_wram = ppu_addr >= 16'hC000 && ppu_addr <= 16'hCFFF;
         cpu_addr_in_wram_banked = cpu_addr >= 16'hD000 && cpu_addr <= 16'hDFFF;
