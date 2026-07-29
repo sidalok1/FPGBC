@@ -1,34 +1,43 @@
-INCLUDE "hardware.inc" 
+INCLUDE "hardware.inc"
 
 SECTION "Header", ROM0[$100]
 
-Entry:
-	ld hl, Message
-	ld b, [hl]
-	inc hl
-	call PrintSerial
-	jr Done
+	jp EntryPoint
+
+	ds $150 - @, 0 ; Make room for the header
+
+EntryPoint:
+	ld a, TAC_START | TAC_262KHZ
+	ldh [rTAC], a
+	ld a, 0
+	ldh [rTIMA], a
+	ld a, 0
+	ldh [rIF], a
+	halt
+	nop
+	ldh a, [rIF]
+	and IF_TIMER
+	jp z, Failed
+	jp Passed
 
 
-PrintSerial:
-	ld a, [hl+]
-	ld [rSB], a
-	ld a, 0x81
-	ld [rSC], a
-	call AwaitSerial
-	dec b
-	jr nz, PrintSerial
-	ret
+Passed:
+	ld a, '0'
+	ldh [rSB], a
+	ld a, SC_START | SC_INTERNAL | SC_FAST
+	ldh [rSC], a
+	jp WaitSerial
 
-AwaitSerial:
-	ld a, [rSC]
-	bit B_SC_START, a
-	jr z, AwaitSerial
-	ret
+Failed:
+	ld a, '1'
+	ldh [rSB], a
+	ld a, SC_START | SC_INTERNAL | SC_FAST
+	ldh [rSC], a
+	jp WaitSerial
 
-Message:
-	DB 13, "hello world!\n"
-
-Done:
-	jr Done
+WaitSerial:
+	ld hl, rSC
+:	bit B_SC_START, [hl]
+	jr nz, :-
+	stop
 

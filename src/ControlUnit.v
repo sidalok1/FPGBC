@@ -1,7 +1,7 @@
 `default_nettype none
 module ControlUnit(
         clk, rst, en,
-        IE, IF,
+        IE, IF, KEY1,
         ack_IF,
         data,
         r1,
@@ -30,7 +30,7 @@ module ControlUnit(
     input wire          rst;
     input wire          wake;
     output reg          stop = 0, halt = 0;
-    input wire  [7:0]   data, IE, IF;
+    input wire  [7:0]   data, IE, IF, KEY1;
     output reg          write = 0;
     output wire         read;
     output reg          data_sel = DIN;
@@ -78,6 +78,8 @@ module ControlUnit(
     assign interrupt_jump_vector[2] = 16'h50; // Timer interrupt
     assign interrupt_jump_vector[3] = 16'h58; // Serial interrupt
     assign interrupt_jump_vector[4] = 16'h60; // Joypad interrupt
+
+    wire SPEED_SWITCH_ARMED = KEY1[0];
 
     wire [IDU_OPWIDTH:0] r16mem_op [0:3];
     assign r16mem_op[0] = ZER; // [bc]
@@ -233,17 +235,20 @@ module ControlUnit(
                 intr_state_n = S3;
             end
             S3: begin
+                data_sel = ALU;
                 ctr = interrupt_jump_vector[next_interrupt][7:0];
                 rd = PCL;
                 intr_state_n = S4;
             end
             S4: begin
+                data_sel = ALU;
                 ctr = interrupt_jump_vector[next_interrupt][15:8];
                 rd = PCH;
                 intr_state_n = S5;
             end
             S5: begin
                 rd_idu = PC;
+                idu_op = ZER;
                 ack_IF[next_interrupt] = 1;
                 unset_IME = 1;
                 fetch = 1;
@@ -256,7 +261,7 @@ module ControlUnit(
             prefix_next = 1;
             case ( state )
             S0: begin
-                if ( IR[2:0] == 'b110 ) begin
+                if ( IR[2:0] == 'b110 ) begin // OP xxx, [hl]
                     next = S1;
                     addrh = H;
                     addrl = L;
@@ -277,15 +282,22 @@ module ControlUnit(
                 end
             end
             S1: begin
-                addrh = H;
-                addrl = L;
+                if ( IR[7:6] == 2'b01 ) begin // BIT u3, [hl]
+                    rd_idu = PC;
+                    fetch = 1;
+                    prefix_next = 0;
+                end
+                else begin
+                    addrh = H;
+                    addrl = L;
+                    write = 1;
+                    next = S2;
+                end
                 r1 = Z;
                 r2 = CTR;
                 ctr = {5'b0, IR[5:3]};
                 alu_op = {2'b10, IR[7:6]};
                 flag_mask = ALLFLAG;
-                write = IR[7:6] != 2'b01; // no write for BIT
-                next = S2;
             end
             S2: begin
                 rd_idu = PC;
@@ -633,12 +645,12 @@ module ControlUnit(
             case ( state )
                 S0: begin
                     stop = 1;
+                    if ( IME == 0 && SPEED_SWITCH_ARMED == 0 ) $finish;
                     // if ( IE & IF ) begin
                     //     rd_idu = PC;
                     //     fetch = 1;
                     // end 
                 end
-                // S1: $finish();
             default:; // one-hot
             endcase
         end
@@ -720,8 +732,7 @@ module ControlUnit(
             S0: begin
                 if ( halt_condition ) begin
                     next = S1;
-                    idu_op = DEC;
-                    rd_idu = PC;
+                    // rd_idu = PC;
                 end
                 else if ( IR[5:3] == 'b110 ) begin
                     next = S2;
@@ -749,13 +760,12 @@ module ControlUnit(
             S1: begin
                 // Nintendo says that awaking from an interrupt can still happen
                 // with IME = 0, just moves on to next instruction
-                fetch = 1;
                 halt = 1;
-                // next = S1;
-                // if ( IE & IF ) begin
-                //     next = S0;
-                //     rd_idu = PC;
-                // end
+                next = S1;
+                if ( |IF[4:0] ) begin
+                    next = S0;
+                    fetch = 1;
+                end
             end
             S2: begin
                 fetch = 1;
@@ -887,7 +897,8 @@ module ControlUnit(
             end
             S3: begin
                 if ( IR[4] ) begin // if returning from interrupt, go to previous state
-                    next = intr_return_state;
+                    // next = intr_return_state;
+                    next = S0;
                     prefix_next = prefix_return;
                 end 
                 else begin

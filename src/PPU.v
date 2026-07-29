@@ -1,6 +1,6 @@
 `default_nettype none
 module PPU (
-    input wire clk, rst, en,
+    input wire clk, rst, en, cpu_en,
 
     input wire [15:0] addr_in,
     output reg [15:0] addr_out,
@@ -543,14 +543,14 @@ module PPU (
                     BGPD: begin
                         if ( current_mode != drawing )
                             BGP_RGB[BGP_ADDR] <= data_in;
-                        if ( BGP_AUTO_INC )
+                        if ( BGP_AUTO_INC && cpu_en )
                             BGPI_reg[5:0] <= BGPI_reg[5:0] + 1;
                     end
                     OBPI:   OBPI_reg <=         data_in;
                     OBPD: begin
                         if ( current_mode != drawing )
                             OBP_RGB[OBP_ADDR] <= data_in;
-                        if ( OBP_AUTO_INC )
+                        if ( OBP_AUTO_INC && cpu_en )
                             OBPI_reg[5:0] <= OBPI_reg[5:0] + 1;
                     end
                     OPRI:   OPRI_reg <=         data_in;
@@ -766,7 +766,7 @@ module PPU (
                         if ( dot_counter == 79 ) begin // 80th dot
                             next_mode = drawing;
 
-                            fetch_counter_n = 1;
+                            fetch_counter_n = 0;
 
                             win_x_n = 0;
                             output_x_n = 0;
@@ -1074,8 +1074,8 @@ module PPU (
                 STAT:   data_out = STAT_reg;
                 SCY:    data_out = SCY_reg;
                 SCX:    data_out = SCX_reg;
-                // LY:     data_out = LY_reg;
-                LY:     data_out = 8'h90;
+                LY:     data_out = LY_reg;
+                // LY:     data_out = 8'h90;
                 LYC:    data_out = LYC_reg;
                 DMA:    data_out = DMA_reg;
                 BGP:    data_out = BGP_reg;

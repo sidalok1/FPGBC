@@ -3,6 +3,11 @@
 localparam SB		= 16'hFF01;
 localparam SC		= 16'hFF02;
 
+localparam DIV      = 16'hFF04;
+localparam TIMA     = 16'hFF05;
+localparam TMA      = 16'hFF06;
+localparam TAC      = 16'hFF07;
+
 localparam IF       = 16'hFF0F;
 
 localparam LCDC     = 16'hFF40;

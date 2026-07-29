@@ -25,6 +25,7 @@
 #include <iomanip>
 #include <chrono>
 #include <fstream>
+#include <cmath>
 using namespace std::chrono;
 #include <memory>
 
@@ -41,9 +42,7 @@ static constexpr int GBC_H       = 144;   // GBC visible lines
 
 // How many master-clock cycles to simulate before giving up if no frame arrives
 static constexpr uint64_t GB_SEC = 4e6;
-static constexpr uint64_t MAX_CYCLES = GB_SEC * 40;
-static constexpr uint64_t CYCLE_INTERVAL = long(1e7);
-static constexpr int clk_period_half = int(((1/4e6)*1e12)/2);
+static constexpr uint64_t MAX_CYCLES = GB_SEC * 120;
 
 // -------------------------------------------------------------------------
 // RGB555 -> RGB888 expansion helper
@@ -55,9 +54,10 @@ static inline uint8_t expand5to8(uint8_t v5) {
 // main
 // -------------------------------------------------------------------------
 int main(int argc, char** argv) {
-    auto start = high_resolution_clock::now();
+    // auto start = high_resolution_clock::now();
     // --- Verilator setup ---------------------------------------------------
     const std::unique_ptr<VerilatedContext> ctx{new VerilatedContext};
+    float clk_period_half = ((1.0/4.194304e6)*std::pow(10, ctx->timeprecision()))/2.0;
     // VerilatedContext* ctx = new VerilatedContext;
     ctx->commandArgs(argc, argv);
 
@@ -155,19 +155,21 @@ int main(int argc, char** argv) {
     // --- Reset sequence ----------------------------------------------------
     // Hold reset for 4 cycles then release
     // gbc->done = 0;
+    gbc->eval();
+    ctx->timeInc(clk_period_half);
     gbc->clk = 0;
     gbc->rst = 1;
     gbc->sck_i = 0;
     gbc->sdi = 0;
     for (int i = 0; i < 8; i++) {
         gbc->clk ^= 1;
-        ctx->timeInc(clk_period_half);
         gbc->eval();
+        ctx->timeInc(clk_period_half);
     }
     gbc->rst = 0;
     
-    auto end = high_resolution_clock::now();
-    auto duration = duration_cast<microseconds>(end - start);
+    // auto end = high_resolution_clock::now();
+    // auto duration = duration_cast<microseconds>(end - start);
     // std::cout   << "Initialization time: "
     //             << duration.count()
     //             << " us" << std::endl;
@@ -180,7 +182,7 @@ int main(int argc, char** argv) {
     int pixels_on_line = 0;
     uint64_t frame = 0;
     bool prefixed = false;
-    while (running && cycle < MAX_CYCLES) {
+    while (running && cycle < MAX_CYCLES && !ctx->gotFinish()) {
     // while (running) {
 
         // Tick the clock (two eval() calls = one full master clock cycle)
@@ -278,17 +280,17 @@ int main(int argc, char** argv) {
 
         if (vsync_falling) {
             // one-time raw dump for debugging — write a PPM, viewable in any image viewer
-            frame++;
-            if (frame == 100) {
-                FILE* f = fopen("./_out/frame.ppm", "wb");
-                fprintf(f, "P6\n%d %d\n255\n", GBC_W, GBC_H);
-                for (int i = 0; i < GBC_W * GBC_H; i++) {
-                    uint32_t px = framebuf[i];
-                    uint8_t r = (px >> 16) & 0xFF, g = (px >> 8) & 0xFF, b = px & 0xFF;
-                    fwrite(&r, 1, 1, f); fwrite(&g, 1, 1, f); fwrite(&b, 1, 1, f);
-                }
-                fclose(f);
-            }
+            // frame++;
+            // if (frame == 100) {
+            //     FILE* f = fopen("./_out/frame.ppm", "wb");
+            //     fprintf(f, "P6\n%d %d\n255\n", GBC_W, GBC_H);
+            //     for (int i = 0; i < GBC_W * GBC_H; i++) {
+            //         uint32_t px = framebuf[i];
+            //         uint8_t r = (px >> 16) & 0xFF, g = (px >> 8) & 0xFF, b = px & 0xFF;
+            //         fwrite(&r, 1, 1, f); fwrite(&g, 1, 1, f); fwrite(&b, 1, 1, f);
+            //     }
+            //     fclose(f);
+            // }
             // VBlank just started: present the completed frame
             in_vblank = true;
 
@@ -396,7 +398,11 @@ int main(int argc, char** argv) {
     gbdoc_fstream.close();
     #endif
 
-    if (cycle >= MAX_CYCLES){
+
+    if (ctx->gotFinish()) {
+        SDL_Log("Simulation ended with $finish");
+    }
+    else if (cycle >= MAX_CYCLES){
         SDL_Log("Simulation ended: MAX_CYCLES reached");
         SDL_Event e;
         while (true) {

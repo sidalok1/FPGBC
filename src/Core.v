@@ -50,6 +50,7 @@ module Core(
     wire cc_result;
 
     reg [7:0] hram [0:126];
+    reg addr_in_hram;
 
     //  |   SPEED   |     ?     |     ?     |     ?     |     ?     |     ?     |     ?     |   ARMED   |
     //  |     R     |                                                                       |    R/W    |
@@ -71,7 +72,7 @@ module Core(
 
     ControlUnit controller (
         .clk( clk ), .en( cpu_en ), .rst( rst ),
-        .IE( IE_reg ), .IF ( IF_reg ),
+        .IE( IE_reg ), .IF ( IF_reg ), .KEY1( KEY1_reg ),
         .ack_IF( sig_ack_IF ),
         .data( databus ),
         .data_sel( sig_data_sel ),
@@ -168,6 +169,7 @@ module Core(
         dout = 0;
         databus = alu_out;
         last_dot_of_phase = (speed == 0 && cpu_phase == 'd3) || (speed == 1 && cpu_phase == 'd1);
+        addr_in_hram = addrbus >= 16'hFF80 && addrbus <= 16'hFFFE;
 
         // if ( sig_stop == 1 )
         //     if ( armed == 1 )
@@ -184,11 +186,11 @@ module Core(
         else
             cpu_phase_n = cpu_phase + 1;
 
-        if ( sig_writeback && last_dot_of_phase ) begin // writes only issued on last dot of phase
+        if ( sig_writeback ) begin
             dout = alu_out;
             case ( addrbus )
             IF, IE, KEY1: we = 0; // CPU will handle these writes
-            default: we = 1; 
+            default: we = addr_in_hram ? 0 : 1; 
             endcase
         end
         else if ( sig_readmem ) begin
@@ -198,7 +200,7 @@ module Core(
                 IE:     databus = IE_reg;
                 KEY1:   databus = KEY1_reg;
                 default: begin
-                    if ( addrbus >= 16'hFF80 && addrbus <= 16'hFFFE ) begin
+                    if ( addr_in_hram ) begin
                         databus = hram[addrbus - 16'hFF80];
                     end else begin
                         databus = din;

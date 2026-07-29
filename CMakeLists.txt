@@ -50,6 +50,7 @@ set(HDL_SOURCES
     src/PriorityEncoder5.v
     src/PriorityEncoder10.v
     src/Serial.v
+    src/Timer.v
 )
 
 verilate(gbc_sim
@@ -71,7 +72,7 @@ verilate(gbc_sim
         --trace-max-array 0
         # --trace-max-width 0
         # -CFLAGS "-ggdb -O3"
-        -CFLAGS "-O3"
+        # -CFLAGS "-O3"
         # -LDFLAGS "-ggdb"
         # --valgrind
         # --gdb
@@ -80,7 +81,7 @@ verilate(gbc_sim
         # -no-decoration
     OPT_FAST      "-O3 -march=native"
     TOP_MODULE    System
-    # TRACE_FST
+    TRACE_FST
     PREFIX        Vgbc
 )
 # Target compile and link profiling options

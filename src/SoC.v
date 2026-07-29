@@ -26,7 +26,6 @@ module SoC #(
     wire sig_cpu_en;
     wire [4:0] sig_cpu_intr_req;
     assign sig_cpu_intr_req[4] = 0; // to be implemented
-    assign sig_cpu_intr_req[2] = 0;
     wire sig_cpu_dbl_spd;
     wire sig_cpu_stop;
 
@@ -38,6 +37,10 @@ module SoC #(
     wire [7:0] sig_mac_cpu_din, sig_mac_ppu_din;
 
     wire [7:0] sig_serial_dout;
+
+    wire [7:0] sig_timer_dout;
+
+    wire [13:0] sig_system_counter;
 
     ClockDivider #(
         .I_CLK_FRQ(clk_frq),
@@ -60,7 +63,7 @@ module SoC #(
     );
 
     PPU pixel_processing_unit (
-        .clk(clk), .rst(rst), .en(dotclk_en),
+        .clk(clk), .rst(rst), .en(dotclk_en), .cpu_en(sig_cpu_en),
         .addr_in(sig_cpu_addrbus), .addr_out(sig_ppu_addro),
         .data_in(sig_ppu_din), .data_out(sig_ppu_dout),
         .wen(sig_cpu_we), .ren(sig_cpu_re),
@@ -91,7 +94,14 @@ module SoC #(
         .seri_intr(sig_cpu_intr_req[3])
     );
 
-    assign sig_cpu_din = sig_ppu_dout | sig_mac_cpu_din | sig_serial_dout;
+    Timer timer_module (
+        .clk(clk), .en(sig_cpu_en), .rst(rst),
+        .addr(sig_cpu_addrbus), .din(sig_cpu_dout), .dout(sig_timer_dout),
+        .we(sig_cpu_we), .re(sig_cpu_re), .stop(sig_cpu_stop), 
+        .time_intr(sig_cpu_intr_req[2]), .system_counter(sig_system_counter)
+    );
+
+    assign sig_cpu_din = sig_ppu_dout | sig_mac_cpu_din | sig_serial_dout | sig_timer_dout;
     assign sig_ppu_din = sig_ppu_rout ? sig_mac_ppu_din : sig_cpu_dout;
 
 endmodule

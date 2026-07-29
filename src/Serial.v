@@ -42,11 +42,6 @@ module Serial (
 
 	reg posedge_detected, negedge_detected;
 
-
-	localparam IDLE = 3'b001;
-	localparam CONT = 3'b010;
-	localparam PERI = 3'b100;
-	reg [2:0] state = IDLE, state_n;
 	reg [2:0] count = 0, count_n;
 
 	always @ ( posedge clk ) begin
@@ -54,22 +49,18 @@ module Serial (
 			SB_reg <= 0;
 			SC_reg <= 0;
 			divider <= 0;
-			state <= IDLE;
 			sck_reg <= 0;
 			count <= 0;
 			sdo_reg <= 0;
 		end
 		else 
-		if ( en | we ) begin
+		if ( en ) begin
 			SB_reg <= SB_reg_n;
 			SC_reg <= SC_reg_n;
-			if ( en ) begin // only on cpu en
-				divider <= divider_n;
-				sck_reg <= sck_reg_n;
-				state <= state_n;
-				count <= count_n;
-				sdo_reg <= sdo_reg_n;
-			end
+			divider <= divider_n;
+			sck_reg <= sck_reg_n;
+			count <= count_n;
+			sdo_reg <= sdo_reg_n;
 		end
 	end
 
@@ -81,7 +72,6 @@ module Serial (
 		sck_reg_n = 0;
 		sdo_reg_n = sdo_reg;
 		dout = 0;
-		state_n = state;
 		count_n = count;
 
 		
@@ -96,7 +86,6 @@ module Serial (
 			sck_o :
 			sck_i;
 		
-		// sck_o = 0;
 
 		if ( ~TRANSFER_EN ) begin // awaiting transfer
 			if ( we )
