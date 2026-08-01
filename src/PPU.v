@@ -241,7 +241,7 @@ module PPU (
         reg obj_fifo_merge [0:7]; // 1 for each position to be overwritten by merge
         reg obj_fifo_merge_n [0:7];
         reg [7:0] obj_low = 0, obj_low_n, obj_high = 0, obj_high_n;
-        reg [2:0] obj_fifo_len;
+        reg [3:0] obj_fifo_len;
         reg obj_fifo_flush = 0, obj_fifo_flush_n;
         reg obj_fifo_read;
         reg obj_fifo_push;
@@ -294,33 +294,36 @@ module PPU (
                 else
                 if ( en && LCD_EN ) begin
                     // bgr fifo
-                    if ( bgr_fifo_flush )
+                    if ( bgr_fifo_flush ) begin
                         bgr_fifo[n] <= 0;
-                    else 
-                    if ( bgr_fifo_push )
+                    end
+                    else if ( bgr_fifo_push ) begin
                         if ( tile_attr[5] == 1 )
                             bgr_fifo[n] <= {data_high[n], data_low[n], tile_attr[2:0], tile_attr[7]};
                         else
                             bgr_fifo[n] <= {data_high[7-n], data_low[7-n], tile_attr[2:0], tile_attr[7]};
-                    else 
-                    if ( bgr_fifo_read )
+                    end
+                    else if ( bgr_fifo_read ) begin
                         if ( n < 7 )
                             bgr_fifo[n] <= bgr_fifo[n+1];
+                    end
                     // obj fifo
                     obj_fifo_merge[n] <= obj_fifo_merge_n[n];
-                    if ( obj_fifo_flush )
+                    if ( obj_fifo_flush ) begin
                         obj_fifo[n] <= 0;
-                    else
-                    if ( obj_fifo_push )
+                    end
+                    else if ( obj_fifo_push ) begin
                         if ( obj_attr[5] == 1 )
-                            if ( !DMG_mode )
+                            if ( !DMG_mode ) begin
                                 obj_fifo[n] <= obj_fifo_merge[n] ?
                                     {obj_addr[7:2], obj_high[n], obj_low[n], obj_attr[2:0], obj_attr[7]} :
                                     obj_fifo[n];
-                            else
+                            end
+                            else begin
                                 obj_fifo[n] <= obj_fifo_merge[n] ?
                                     {obj_addr[7:2], obj_high[n], obj_low[n], 2'b0, obj_attr[4], obj_attr[7]} :
                                     obj_fifo[n];
+                            end
                         else
                             if ( !DMG_mode )
                                 obj_fifo[n] <= obj_fifo_merge[7-n] ?
@@ -330,6 +333,11 @@ module PPU (
                                 obj_fifo[n] <= obj_fifo_merge[7-n] ?
                                     {obj_addr[7:2], obj_high[7-n], obj_low[7-n], 2'b0, obj_attr[4], obj_attr[7]} :
                                     obj_fifo[n];
+                    end
+                    else if ( obj_fifo_read ) begin
+                        if ( n < 7 )
+                            obj_fifo[n] <= obj_fifo[n+1];
+                    end
                 end
             end
         end
@@ -341,26 +349,16 @@ module PPU (
             obj_fifo_len <= 0;
             obj_fifo_flush <= 0;
         end
-        else
-        if ( en && LCD_EN ) begin
+        else if ( en && LCD_EN ) begin
             bgr_fifo_flush <= bgr_fifo_flush_n;
-            if ( bgr_fifo_flush )
-                bgr_fifo_len <= 0;
-            else 
-            if ( bgr_fifo_push )
-                bgr_fifo_len <= 8;
-            else
-            if ( bgr_fifo_read )
-                bgr_fifo_len <= (bgr_fifo_len == 0) ? 0 : bgr_fifo_len - 1;
+            if ( bgr_fifo_flush )       bgr_fifo_len <= 0;
+            else if ( bgr_fifo_push )   bgr_fifo_len <= 8;
+            else if ( bgr_fifo_read )   bgr_fifo_len <= (bgr_fifo_len == 0) ? 0 : bgr_fifo_len - 1;
+
             obj_fifo_flush <= obj_fifo_flush_n;
-            if ( obj_fifo_flush )
-                obj_fifo_len <= 0;
-            else
-            if ( obj_fifo_push )
-                obj_fifo_len <= 8;
-            else
-            if ( obj_fifo_read )
-                obj_fifo_len <= (obj_fifo_len == 0) ? 0 : obj_fifo_len - 1;
+            if ( obj_fifo_flush )       obj_fifo_len <= 0;
+            else if ( obj_fifo_push )   obj_fifo_len <= 8;
+            else if ( obj_fifo_read )   obj_fifo_len <= (obj_fifo_len == 0) ? 0 : obj_fifo_len - 1;
         end
     end
 
@@ -694,8 +692,6 @@ module PPU (
         end
         else 
         if ( win_state ) begin
-            // increment window x counter when window is active
-            win_x_n = win_x + 1;
             map_base = (WIN_MAP == 0) ? 13'h1800 : 13'h1C00;
             pix_x = win_x;
             pix_y = win_y;
@@ -727,7 +723,7 @@ module PPU (
                             oam_idx_n = oam_idx + 1;
                             write_obj_arr = 1;
                             obj_arr_elem = 0;
-                            obj_arr_data = oam_dout - (LY_reg + 16);
+                            obj_arr_data = (LY_reg + 16) - oam_dout;
                             obj_valid_n[objs_on_scanline] = 1;
                         end
                         else 
@@ -785,6 +781,97 @@ module PPU (
                 vram0_we = 0;
                 vram1_we = 0;
                 vram_addr = tile_addr;
+
+                // output stage
+                // Increment output_x during initial fetch
+                if ( !obj_trigger && !obj_state && output_x < 8 )
+                    output_x_n = output_x + 1;
+                else
+                if ( !(obj_trigger || obj_state || bgr_fifo_flush || bgr_fifo_len == 0) ) begin 
+                    // any of these conditions stalls the output
+                    // obj_with_priority may get set to 4'hF while data is yet to be pushed to obj_fifo
+                    // if ( win_state )
+                    //     win_x_n = win_x + 1;
+                    de2_n = output_x < 168 ? 1 : 0;
+                    output_x_n = output_x + 1;
+                    bgr_fifo_read = 1;
+                    
+                    // Stage 0
+                    if ( DMG_mode ) begin
+                    // In DMG mode the pallete used might actually be from CRAM? Need to check documentation
+                        if ( obj_fifo_len > 0 ) begin
+                            obj_fifo_read = 1;
+                            if ( (BG_EN == 1) ) begin
+                                if ( obj_pix_idx == 0 || (obj_pix_pri == 1 && bgr_pix_idx != 2'b0) )
+                                    mixed_pixel0_n = {BGP_reg[2*bgr_pix_idx +:2], 3'b000, 1'b0}; // bgr_pix_pal == 3'd0 means non-blank pixel
+                                else
+                                    if ( obj_pix_pal == 0 )
+                                        mixed_pixel0_n = {OBP0_reg[2*obj_pix_idx +:2], obj_pix_pal, 1'b1};
+                                    else
+                                        mixed_pixel0_n = {OBP1_reg[2*obj_pix_idx +:2], obj_pix_pal, 1'b1};
+                            end
+                            else begin
+                                if ( obj_pix_idx == 0 )
+                                    mixed_pixel0_n = {2'b00, 3'b001, 1'b0}; // blank pixel symbolized by bgr_pix_pal 3'd1 color 0
+                                else
+                                    if ( obj_pix_pal == 0 )
+                                        mixed_pixel0_n = {OBP0_reg[2*obj_pix_idx +:2], obj_pix_pal, 1'b1};
+                                    else
+                                        mixed_pixel0_n = {OBP1_reg[2*obj_pix_idx +:2], obj_pix_pal, 1'b1};
+                            end
+                        end
+                        else begin
+                            if ( BG_EN == 1 )
+                            // if ( (BG_EN == 1 && bgr_state == 1) || (WIN_EN == 1 && win_state == 1) )
+                                mixed_pixel0_n = {BGP_reg[2*bgr_pix_idx +:2], 3'b000, 1'b0};
+                            else
+                                mixed_pixel0_n = {2'b00, 3'b001, 1'b0};
+                        end
+                    end
+                    else 
+                    begin // CGB_mode
+                        if ( obj_fifo_len > 0 ) begin
+                            obj_fifo_read = 1;
+                            if ( BG_EN == 1 ) begin
+                                if ( obj_pix_idx == 0 || (((obj_pix_pri | bgr_pix_pri) == 1) && (bgr_pix_idx != 0)) )
+                                    mixed_pixel0_n = {bgr_pix_idx, bgr_pix_pal, 1'b0};
+                                else
+                                    mixed_pixel0_n = {obj_pix_idx, obj_pix_pal, 1'b1};
+                            end
+                            else begin
+                                if ( obj_pix_idx == 0 )
+                                    mixed_pixel0_n = {bgr_pix_idx, bgr_pix_pal, 1'b0};
+                                else
+                                    mixed_pixel0_n = {obj_pix_idx, obj_pix_pal, 1'b1};
+                            end
+                        end else begin
+                            mixed_pixel0_n = {bgr_pix_idx, bgr_pix_pal, 1'b0};
+                        end
+                    end
+                end
+                // Stage 1
+                mixed_pixel_n = mixed_pixel0;
+                if ( mixed_pixel0[0] == 0 )
+                    rgb_low0_n = BGP_RGB[{mixed_pixel0[3:1], mixed_pixel0[5:4], 1'b0}];
+                else
+                    rgb_low0_n = OBP_RGB[{mixed_pixel0[3:1], mixed_pixel0[5:4], 1'b0}];
+                // Stage 2
+                rgb_low_n = rgb_low0;
+                if ( mixed_pixel[0] == 0 )
+                    rgb_high_n = BGP_RGB[{mixed_pixel[3:1], mixed_pixel[5:4], 1'b1}];
+                else
+                    rgb_high_n = OBP_RGB[{mixed_pixel[3:1], mixed_pixel[5:4], 1'b1}];
+                // end
+                // Stage 3
+                r_n = rgb_low[4:0];
+                g_n = {rgb_high[1:0], rgb_low[7:5]};
+                b_n = rgb_high[6:2];
+                if ( output_x >= 168 && !(de0 | de1 | de2) ) begin
+                    // Wait for output pipeline to empty
+                    next_mode = h_blank;
+                end
+
+                // fetcher
                 case ( fetcher_state )
                     fetcher_bgr_map_addr,
                     fetcher_win_map_addr: begin 
@@ -815,15 +902,16 @@ module PPU (
                     end
                     fetcher_bgr_push_fifo,
                     fetcher_win_push_fifo: begin
-                        if ( bgr_fifo_len == 0 || (bgr_fifo_len == 1 && bgr_fifo_read) ) begin
+                        if ( bgr_fifo_len == 0 || ((bgr_fifo_len == 4'd1) && (bgr_fifo_read == 1)) ) begin
+                            // FIFO can be pushed to if it is empty or if its  last element is being read
                             bgr_fifo_push = 1;
                             
                             fetcher_state_n = (bgr_state) ? fetcher_bgr_map_addr : fetcher_win_map_addr;
-                            // if ( bgr_state )
-                            //     fetch_counter_n = fetch_counter + 8;
-                            // else if ( win_state )
-                            //     win_x_n = win_x + 8;
-                            fetch_counter_n = fetch_counter + 1;
+                            if ( bgr_state )
+                                fetch_counter_n = fetch_counter + 1;
+                            else if ( win_state )
+                                win_x_n = win_x + 8;
+                            // fetch_counter_n = fetch_counter + 1;
                         end
                         if ( obj_trigger ) begin // there is valid object to be fetched
                             if ( OBJ_EN == 1 ) begin
@@ -841,8 +929,8 @@ module PPU (
                     end
                     fetcher_obj_data_addr: begin
                         tile_addr_n = (obj_attr[6] == 0) ? 
-                            13'(obj_tile) + (13'(obj_y) * 2) :
-                            13'(obj_tile) + ((13'(obj_height) - 1 - 13'(obj_y)) * 2);
+                            13'(obj_tile * 16) + (13'(obj_y) * 2) :
+                            13'(obj_tile * 16) + ((13'(obj_height) - 1 - 13'(obj_y)) * 2);
                         fetcher_state_n = fetcher_obj_low_data;
                     end
                     fetcher_obj_low_data: begin
@@ -857,7 +945,9 @@ module PPU (
                     fetcher_obj_merge_fifo: begin
                         obj_valid_n[current_obj] = 0;
                         for ( i = 0; i < 8; i = i + 1 ) begin
-                            if ( obj_attr[5] == 1 ) begin
+                            if ( i+1 > obj_fifo_len )
+                                obj_fifo_merge_n[i] = 1; // empty fifo slot
+                            else if ( obj_attr[5] == 1 ) begin // x-flip, push in reverse order
                                 if ( !OBJ_PRI_MODE ) begin
                                     // transparent pixel OR new object has lower oam idx
                                     obj_fifo_merge_n[i] = (obj_fifo[i][5:4] == 2'b0 || obj_addr[5:0] < obj_fifo[i][11:6]) ? 
@@ -891,7 +981,7 @@ module PPU (
                     end
                 default:; // One hot coded
                 endcase
-                if ( win_trigger && !obj_trigger && !obj_state ) begin 
+                if ( win_trigger && !win_state && !obj_trigger && !obj_state ) begin 
                     // only time fifo flush is high, state is win_map_addr, so fifo can never be flushed and pushed
                     // to in same cycle
                     // if obj_trigger || obj_state is true, the output will stop incrementing output_x
@@ -904,7 +994,8 @@ module PPU (
                     // in other words, the condition (win_trigger && !obj_trigger && !obj_state) can only be high for one cycle for any
                     // given output_x
                     bgr_fifo_flush_n = 1;
-                    fetcher_state_n = fetcher_win_data_addr;
+                    fetcher_state_n = fetcher_win_read_map;
+                    win_x_n = 0;
                     if ( !win_y_cond ) begin
                         // first time this frame the window was triggered
                         win_y_n = 0;
@@ -913,90 +1004,10 @@ module PPU (
                     else begin
                         win_y_n = win_y + 1;
                     end
+                    tile_addr_n = (WIN_MAP == 0) ? 
+                        13'h1800 + (32 * ((13'(win_y_n))/8)) : 13'h1C00 + (32 * ((13'(win_y_n))/8));
                 end
 
-                // output stage
-                // Increment output_x during initial fetch
-                if ( !obj_trigger && !obj_state && output_x < 8 )
-                    output_x_n = output_x + 1;
-                else
-                if ( !(obj_trigger || obj_state || bgr_fifo_flush || (bgr_fifo_len == 0 && !bgr_fifo_push)) ) begin 
-                    // any of these conditions stalls the output
-                    // obj_with_priority may get set to 4'hF while data is yet to be pushed to obj_fifo
-                    de2_n = output_x < 168 ? 1 : 0;
-                    output_x_n = output_x + 1;
-                    bgr_fifo_read = 1;
-                    
-                    // Stage 0
-                    if ( DMG_mode ) begin
-                    // In DMG mode the pallete used might actually be from CRAM? Need to check documentation
-                        if ( obj_fifo_len > 0 ) begin
-                            obj_fifo_read = 1;
-                            if ( BG_EN == 1 ) begin
-                                if ( obj_pix_idx == 0 || obj_pix_pri == 1 )
-                                    mixed_pixel0_n = {BGP_reg[2*bgr_pix_idx +:2], 3'b000, 1'b0}; // bgr_pix_pal == 3'd0 means non-blank pixel
-                                else
-                                    if ( obj_pix_pal == 0 )
-                                        mixed_pixel0_n = {OBP0_reg[2*obj_pix_idx +:2], obj_pix_pal, 1'b1};
-                                    else
-                                        mixed_pixel0_n = {OBP1_reg[2*obj_pix_idx +:2], obj_pix_pal, 1'b1};
-                            end
-                            else begin
-                                if ( obj_pix_idx == 0 )
-                                    mixed_pixel0_n = {BGP_reg[2*bgr_pix_idx +:2], 3'b001, 1'b0}; // blank pixel symbolized by bgr_pix_pal 3'd1
-                                else
-                                    if ( obj_pix_pal == 0 )
-                                        mixed_pixel0_n = {OBP0_reg[2*obj_pix_idx +:2], obj_pix_pal, 1'b1};
-                                    else
-                                        mixed_pixel0_n = {OBP1_reg[2*obj_pix_idx +:2], obj_pix_pal, 1'b1};
-                            end
-                        end
-                        else begin
-                            mixed_pixel0_n = {BGP_reg[2*bgr_pix_idx +:2], 3'b000, 1'b0};
-                        end
-                    end
-                    else 
-                    begin // CGB_mode
-                        if ( obj_fifo_len > 0 ) begin
-                            obj_fifo_read = 1;
-                            if ( BG_EN == 1 ) begin
-                                if ( obj_pix_idx == 0 || (((obj_pix_pri | bgr_pix_pri) == 1) && (bgr_pix_idx != 0)) )
-                                    mixed_pixel0_n = {bgr_pix_idx, bgr_pix_pal, 1'b0};
-                                else
-                                    mixed_pixel0_n = {obj_pix_idx, obj_pix_pal, 1'b1};
-                            end
-                            else begin
-                                if ( obj_pix_idx == 0 )
-                                    mixed_pixel0_n = {bgr_pix_idx, bgr_pix_pal, 1'b0};
-                                else
-                                    mixed_pixel0_n = {obj_pix_idx, obj_pix_pal, 1'b1};
-                            end
-                        end else begin
-                            mixed_pixel0_n = {bgr_pix_idx, bgr_pix_pal, 1'b0};
-                        end
-                    end
-                    // Stage 1
-                    mixed_pixel_n = mixed_pixel0;
-                    if ( mixed_pixel0[0] == 0 )
-                        rgb_low0_n = BGP_RGB[{mixed_pixel0[3:1], mixed_pixel0[5:4], 1'b0}];
-                    else
-                        rgb_low0_n = OBP_RGB[{mixed_pixel0[3:1], mixed_pixel0[5:4], 1'b0}];
-                    // Stage 2
-                    rgb_low_n = rgb_low0;
-                    if ( mixed_pixel[0] == 0 )
-                        rgb_high_n = BGP_RGB[{mixed_pixel[3:1], mixed_pixel[5:4], 1'b1}];
-                    else
-                        rgb_high_n = OBP_RGB[{mixed_pixel[3:1], mixed_pixel[5:4], 1'b1}];
-                    // end
-                    // Stage 3
-                    r_n = rgb_low[4:0];
-                    g_n = {rgb_high[1:0], rgb_low[7:5]};
-                    b_n = rgb_high[6:2];
-                end
-                if ( output_x >= 168 && !(de0 | de1 | de2) ) begin
-                    // Wait for output pipeline to empty
-                    next_mode = h_blank;
-                end
             end
             h_blank: begin
                 hsync_n = 0;
@@ -1008,6 +1019,7 @@ module PPU (
                     oamScan_substate_n = get_y_position;
                     obj_valid_n = 0;
                     inc_LY = 1;
+                    objs_on_scanline_n = 0;
                     
                     if ( LY_reg == 143 ) begin
                         next_mode = v_blank;
@@ -1117,9 +1129,44 @@ module PPU (
         end
         else            data_out = 8'h00;
 
-        
-
     end
+
+    // reg hsync_prev = 1;
+    // reg vsync_prev = 1;
+    // reg [14:0] framebuf [0:(160*144)-1]/*verilator public*/; 
+    // integer idx = 0, jdx = 0;
+    // integer idxi, jdxi;
+    // initial begin 
+    //     for ( idxi = 0; idxi < 144; idxi = idxi + 1 ) begin
+    //         for ( jdxi = 0; jdxi < 160; jdxi = jdxi + 1 ) begin
+    //             framebuf[(idxi*160)+jdxi] = 0;
+    //         end
+    //     end
+    //     idx = 0;
+    //     jdx = 0;
+    // end
+
+    
+
+    // always @ ( posedge clk ) begin
+    //     if ( de ) begin
+    //         framebuf[(idx*160)+jdx] <= {r, g, b};
+    //         jdx <= jdx + 1;
+    //         hsync_prev <= hsync;
+    //         vsync_prev <= vsync;
+    //     end
+    //     else if ( ~hsync & hsync_prev ) begin
+    //         jdx <= 0;
+    //         idx <= idx + 1;
+    //     end
+    //     else if ( ~vsync & vsync_prev ) begin
+    //         jdx <= 0;
+    //         idx <= 0;
+    //     end
+    //     hsync_prev <= hsync;
+    //     vsync_prev <= vsync;
+    // end
+
 
 endmodule
 

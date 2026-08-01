@@ -26,13 +26,15 @@ module MAC(
     //  |                                             SVBK                                              |
     //  |                                              R/W                                              |
     reg [7:0] SVBK_reg = 8'h00;
-
+    /*verilator tracing_off*/
     reg [7:0] bootrom [0:2047 + 'h100];
+    /*verilator tracing_on*/
     reg [11:0] bootrom_addr;
     wire [7:0] bootrom_data = bootrom[bootrom_addr];
 
-
+    /*verilator tracing_off*/
     reg [7:0] wram [0:7][0:4095]; // Eight banks of WRAM, selected with SVBK. Bank 0 always accessible
+    /*verilator tracing_on*/
     reg [11:0] wram_addr;
     reg [2:0] wram_bank_sel; // value of 0 selects bank 1
     reg wram_we;

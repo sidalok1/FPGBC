@@ -23,12 +23,3 @@ localparam [5:0]    S0 = 'b000001,
                     
 
 // `define max_state 5;
-
-`ifdef DEBUG
-`define INVALID_STATE(mnemonic) if ( en ) $display("---\nERROR\ninstruction:\n\t%s\nhas no defined state:\n\t%d\n", mnemonic, state);
-
-`define executing(mnemonic) if ( en ) $display("%s\t-\tstate: %6b", mnemonic, state);
-`else
-`define INVALID_STATE(mnemonic)
-`define executing(mnemonic)
-`endif

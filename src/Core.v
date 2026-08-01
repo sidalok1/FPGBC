@@ -1,5 +1,8 @@
 `default_nettype none
 module Core( 
+    `ifdef DEBUG
+    output wire dbg_break,
+    `endif
     input wire clk, rst, en, 
     input wire [7:0] din,
     output reg [7:0] dout, 
@@ -71,6 +74,9 @@ module Core(
     assign reg_din = sig_data_sel == DIN ? databus : alu_out;
 
     ControlUnit controller (
+        `ifdef DEBUG
+        .dbg_break(dbg_break),
+        `endif
         .clk( clk ), .en( cpu_en ), .rst( rst ),
         .IE( IE_reg ), .IF ( IF_reg ), .KEY1( KEY1_reg ),
         .ack_IF( sig_ack_IF ),
@@ -171,11 +177,11 @@ module Core(
         last_dot_of_phase = (speed == 0 && cpu_phase == 'd3) || (speed == 1 && cpu_phase == 'd1);
         addr_in_hram = addrbus >= 16'hFF80 && addrbus <= 16'hFFFE;
 
-        // if ( sig_stop == 1 )
-        //     if ( armed == 1 )
-        //         speed_n = ~speed;
-        //     else
-        //         stop = 1;
+        if ( sig_stop == 1 )
+            if ( armed == 1 )
+                speed_n = ~speed;
+            else
+                stop = 1;
 
         // cpu_en = en && (cpu_phase == 'd0) && !(stop || sig_halt);
         cpu_en = en && (cpu_phase == 'd0);

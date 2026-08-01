@@ -30,6 +30,7 @@ using namespace std::chrono;
 #include <memory>
 
 // #define GBDOC_FILE "gbdoc.log"
+#define DEBUG
 
 // -------------------------------------------------------------------------
 // Display constants
@@ -177,6 +178,7 @@ int main(int argc, char** argv) {
     
 
     // --- Main simulation loop ----------------------------------------------
+    bool done = false;
     uint64_t cycle = 0;
     std::cout << std::endl;
     int pixels_on_line = 0;
@@ -319,6 +321,31 @@ int main(int argc, char** argv) {
             // Reset pixel write position for the new frame
             cur_x = 0;
             cur_y = 0;
+            #ifdef DEBUG
+            SDL_Log("End of frame");
+            SDL_Event e;
+            bool wait = true;
+            while (wait) {
+                if (SDL_WaitEvent(&e)) {
+                    if (e.type == SDL_EVENT_QUIT) {
+                        done = true;
+                        running = false;
+                        wait = false;
+                    };
+                    if (e.type == SDL_EVENT_KEY_DOWN) {
+                        switch (e.key.key)
+                        {
+                        case SDLK_SPACE:
+                            wait = false;
+                            break;
+                        default:
+                            // continue
+                            break;
+                        }
+                    }
+                }
+            }
+            #endif
         }
 
         if (vsync_rising) {
@@ -373,14 +400,16 @@ int main(int argc, char** argv) {
         if (cycle % 456 == 0) {
             SDL_Event e;
             while (SDL_PollEvent(&e)) {
-                if (e.type == SDL_EVENT_QUIT)
+                if (e.type == SDL_EVENT_QUIT){
                     running = false;
+                    done = true;
+                }
                 if (e.type == SDL_EVENT_KEY_DOWN &&
                     e.key.key == SDLK_ESCAPE)
                     running = false;
             }
         }
-
+        
         
         // if ( cycle % CYCLE_INTERVAL == 0 ){
         //     end = high_resolution_clock::now();
@@ -398,20 +427,21 @@ int main(int argc, char** argv) {
     gbdoc_fstream.close();
     #endif
 
-
-    if (ctx->gotFinish()) {
-        SDL_Log("Simulation ended with $finish");
-    }
-    else if (cycle >= MAX_CYCLES){
-        SDL_Log("Simulation ended: MAX_CYCLES reached");
-        SDL_Event e;
-        while (true) {
-            SDL_PollEvent(&e);
-            if (e.type == SDL_EVENT_QUIT)
-                break;
-            if (e.type == SDL_EVENT_KEY_DOWN &&
-                e.key.key == SDLK_ESCAPE)
-                break;
+    if (!done) {
+        if (ctx->gotFinish()) {
+            SDL_Log("Simulation ended with $finish");
+        }
+        else if (cycle >= MAX_CYCLES){
+            SDL_Log("Simulation ended: MAX_CYCLES reached");
+            SDL_Event e;
+            while (true) {
+                SDL_PollEvent(&e);
+                if (e.type == SDL_EVENT_QUIT)
+                    break;
+                if (e.type == SDL_EVENT_KEY_DOWN &&
+                    e.key.key == SDLK_ESCAPE)
+                    break;
+            }
         }
     }
     // --- Cleanup -----------------------------------------------------------

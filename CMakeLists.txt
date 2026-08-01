@@ -69,17 +69,20 @@ verilate(gbc_sim
         --report-unoptflat
         # --prof-cfuncs
         # --prof-exec
+        # --public
         --trace-max-array 0
-        # --trace-max-width 0
+        --trace-max-width 0
         # -CFLAGS "-ggdb -O3"
         # -CFLAGS "-O3"
+        -DDEBUG
+        -CFLAGS "-D DEBUG -O3"
         # -LDFLAGS "-ggdb"
         # --valgrind
         # --gdb
         # --gdbbt
         # --runtime-debug
         # -no-decoration
-    OPT_FAST      "-O3 -march=native"
+    OPT_FAST      "-march=native -O3"
     TOP_MODULE    System
     TRACE_FST
     PREFIX        Vgbc

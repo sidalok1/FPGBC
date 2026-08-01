@@ -2,6 +2,9 @@
 `default_nettype none
 // `define DEBUG
 module System (
+    `ifdef DEBUG
+    output wire dbg_break,
+    `endif
     input wire clk, rst,
     output wire hsync, vsync, de,
     output wire [4:0] r, g, b,
@@ -21,6 +24,9 @@ module System (
     SoC #(
         .clk_frq(4_000_000)
     ) Gameboy_SOC (
+        `ifdef DEBUG
+        .dbg_break(dbg_break),
+        `endif
         .clk(clk), .rst(rst),
         .din(cart_to_soc_data), .dout(soc_to_cart_data),
         .addrbus(addr_line),
@@ -47,8 +53,6 @@ module System (
         $dumpvars(0, System);
     end
 
-    // always @* begin
-    //     if ( done ) $finish;
-    // end
+
 
 endmodule

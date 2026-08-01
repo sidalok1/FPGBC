@@ -62,6 +62,7 @@ ELSE
 	SECTION "Boot", ROM0[$000]
 
 	start:
+		di
 		ld sp, 0xFFFE
 		call pal_load
 		ld a, SYS_DMG
@@ -71,14 +72,13 @@ ELSE
 		ld bc, 0x0000
 		ld de, 0xFF56
 		ld hl, 0x000D
-		ld de, 0xFF50
-		ld a, 0x01
+		ld a, 0x11
 		jp Unmap_ROM
-		
-	SECTION "Unmap", ROM0[$0FF]
+
+	SECTION "Unmap", ROM0[$FE]
 
 	Unmap_ROM:
-		ld [de], a ; Load a to BANK (unmap)
+		ldh [rBANK], a ; two byte instruction ( 0xFE: OPCODE, 0xFF: IMM )
 		
 	SECTION "Subroutines", ROM0[$200]
 

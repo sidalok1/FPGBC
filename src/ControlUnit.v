@@ -16,6 +16,9 @@ module ControlUnit(
         alu_op, flag_mask, idu_op, load_flags, clear_flags,
         cc, cc_true,
         wake,
+        `ifdef DEBUG
+        dbg_break,
+        `endif
         stop,
         halt
 );
@@ -25,6 +28,10 @@ module ControlUnit(
     `include "IDU_params.vh"
     `include "ALU_params.vh"
 
+    `ifdef DEBUG
+    output reg dbg_break;
+    wire [8:0] dbg_state;
+    `endif
     input wire          clk;
     input wire          en;
     input wire          rst;
@@ -42,6 +49,7 @@ module ControlUnit(
     output reg  [4:0]   flag_mask;
     output reg  [1:0]   cc;
     output reg  [7:0]   ack_IF = 0;
+    reg [7:0]           ack_IF_n;
     input wire          cc_true;
     output reg load_flags;
     output reg [3:0] clear_flags;
@@ -140,6 +148,10 @@ module ControlUnit(
     //     end
     // end
 
+    `ifdef DEBUG
+    assign dbg_state = {prefix, IR};
+    `endif
+
     always @ ( posedge clk ) begin
         if ( rst ) begin
             state <= S0;
@@ -150,6 +162,7 @@ module ControlUnit(
             IME <= 0;
             prefix <= 0;
             prefix_return <= 0;
+            ack_IF <= 0;
         end
         else if ( en ) begin
             state <= next;
@@ -172,6 +185,7 @@ module ControlUnit(
             end
             prefix <= prefix_next;
             prefix_return <= prefix_return_n;
+            ack_IF <= ack_IF_n;
         end
     end
 
@@ -198,15 +212,18 @@ module ControlUnit(
         unset_IME = 0;
         prefix_next = 0;
         prefix_return_n = prefix_return;
-        ack_IF = 0;
+        ack_IF_n = 0;
         stop = 0;
         halt = 0;
         load_flags = 0;
         clear_flags = 4'b0;
-        
+        `ifdef DEBUG
+        dbg_break = 0;
+        `endif
 
         // begin state logic
         if ( IME & intr_valid ) begin
+            // Interrupt handler
             case ( intr_state ) 
             S0: begin
                 // save current state, to return to on reti
@@ -249,7 +266,7 @@ module ControlUnit(
             S5: begin
                 rd_idu = PC;
                 idu_op = ZER;
-                ack_IF[next_interrupt] = 1;
+                ack_IF_n[next_interrupt] = 1;
                 unset_IME = 1;
                 fetch = 1;
             end
@@ -257,7 +274,7 @@ module ControlUnit(
             endcase
         end
         else if ( prefix ) begin 
-            // prefixed arithmetic
+            // prefixed instructions
             prefix_next = 1;
             case ( state )
             S0: begin
@@ -288,6 +305,7 @@ module ControlUnit(
                     prefix_next = 0;
                 end
                 else begin
+                    data_sel = ALU;
                     addrh = H;
                     addrl = L;
                     write = 1;
@@ -309,17 +327,12 @@ module ControlUnit(
         end
         else casez ( IR )
         'b00_000_000: begin
-            `ifdef DEBUG
-                if ( en )
-                $display("nop");
-            `endif
             // nop
             rd_idu = PC;
             fetch = 1;
         end
         'b00_??0_001: begin
             // ld r16, imm16
-            `executing("ld r16, imm16")
             case ( state )
             S0: begin
                 next = S1;
@@ -343,7 +356,7 @@ module ControlUnit(
             endcase
         end
         'b00_??0_010: begin
-            `executing("ld [r16mem], a")
+            // ld [r16mem], a
             case ( state )
             S0: begin
                 next = S1;
@@ -363,11 +376,7 @@ module ControlUnit(
             endcase
         end
         'b00_??0_011: begin
-            `ifdef DEBUG
-                if ( en )
-                $display("inc r16");
-            `endif
-            // 
+            // inc r16
             case ( state )
             S0: begin
                 next = S1;
@@ -383,10 +392,7 @@ module ControlUnit(
             endcase
         end
         'b00_???_100: begin
-            `ifdef DEBUG
-                if ( en )
-                $display("inc r8");
-            `endif
+            // inc r8
             case ( state )
             S0: begin
                 if ( IR[5:3] == 'b110 ) begin
@@ -426,10 +432,7 @@ module ControlUnit(
             endcase
         end
         'b00_???_101: begin
-            `ifdef DEBUG
-                if ( en )
-                $display("dec r8");
-            `endif
+            // dec r8
             case ( state )
             S0: begin
                 if ( IR[5:3] == 'b110 ) begin
@@ -469,10 +472,7 @@ module ControlUnit(
             endcase
         end
         'b00_???_110: begin
-            `ifdef DEBUG
-                if ( en )
-                $display("ld r8, imm8");
-            `endif
+            // ld r8, imm8
             case ( state )
             S0: begin
                 rd_idu = PC;
@@ -501,6 +501,7 @@ module ControlUnit(
             endcase
         end
         'b00_???_111: begin
+            // block 00 arithmetic
             r1 = A;
             data_sel = ALU;
             rd_idu = PC;
@@ -529,10 +530,11 @@ module ControlUnit(
             'b111: begin
                 alu_op = CCF;
             end
+            default:; //
             endcase
         end
         'b00_001_000: begin
-            `executing("ld [imm16], sp")
+            // ld [imm16], sp
             case ( state )
             S0: begin
                 next = S1;
@@ -571,7 +573,7 @@ module ControlUnit(
             endcase
         end
         'b00_??1_001: begin
-            `executing("add hl, r16")
+            // add hl, r16
             data_sel = ALU;
             flag_mask = NFLAG | HFLAG | CFLAG ;
             case ( state )
@@ -597,10 +599,7 @@ module ControlUnit(
             endcase
         end
         'b00_??1_010: begin
-            `ifdef DEBUG
-                if ( en )
-                $display("ld a, [r16mem]");
-            `endif
+            // ld a, [r16mem]
             case ( state )
             S0: begin
                 next = S1;
@@ -620,10 +619,7 @@ module ControlUnit(
             endcase
         end
         'b00_??1_011: begin
-            `ifdef DEBUG
-                if ( en )
-                $display("dec r16");
-            `endif
+            // dec r16
             case ( state )
             S0: begin
                 next = S1;
@@ -640,12 +636,16 @@ module ControlUnit(
             endcase
         end
         'b00_010_000: begin
-            `executing("stop")
-            // temporary (possibly incorrect) implementation of stop
+            // stop
+            // temporary (possibly incorrect) implementation
             case ( state )
                 S0: begin
                     stop = 1;
-                    if ( IME == 0 && SPEED_SWITCH_ARMED == 0 ) $finish;
+                    if ( SPEED_SWITCH_ARMED ) begin
+                        rd_idu = PC;
+                        fetch = 1;
+                    end
+                    // if ( IME == 0 && SPEED_SWITCH_ARMED == 0 ) $finish;
                     // if ( IE & IF ) begin
                     //     rd_idu = PC;
                     //     fetch = 1;
@@ -655,7 +655,7 @@ module ControlUnit(
             endcase
         end
         'b00_011_000: begin
-            `executing("jr imm8")
+            // jr imm8
             case ( state )
             S0: begin
                 next = S1;
@@ -687,7 +687,7 @@ module ControlUnit(
             endcase
         end
         'b00_1??_000: begin
-            `executing("jr cond, imm8")
+            // jr cond, imm8
             case ( state )
             S0: begin
                 data_sel = DIN;
@@ -728,20 +728,29 @@ module ControlUnit(
             endcase
         end
         'b01_???_???: begin
+            // ld r8, r8
             case ( state )
             S0: begin
-                if ( halt_condition ) begin
+                `ifdef DEBUG
+                if ( IR[5:0] == 6'b000_000) begin
+                    fetch = 1;
+                    rd_idu = PC;
+                    dbg_break = 1;
+                end
+                else
+                `endif
+                if ( halt_condition ) begin // ld [hl], [hl]
                     next = S1;
                     // rd_idu = PC;
                 end
-                else if ( IR[5:3] == 'b110 ) begin
+                else if ( IR[5:3] == 'b110 ) begin // ld [hl], r8
                     next = S2;
                     addrh = H;
                     addrl = L;
                     r1 = {1'b0, IR[2:0]};
                     write = 1;
                 end 
-                else if ( IR[2:0] == 'b110 ) begin
+                else if ( IR[2:0] == 'b110 ) begin // ld r8, [hl]
                     next = S2;
                     addrh = H;
                     addrl = L;
@@ -775,6 +784,8 @@ module ControlUnit(
             endcase
         end
         'b10_???_???: begin
+            // block 2 arithmetic
+            // OP a, r8
             case ( state )
             S0: begin
                 if ( IR[2:0] == 'b110 ) begin
@@ -817,7 +828,7 @@ module ControlUnit(
             endcase
         end
         'b11_0??_000: begin
-            `executing("ret cc")
+            // ret cc
             case ( state )
             S0: begin
                 cc = IR[4:3];
@@ -860,14 +871,8 @@ module ControlUnit(
             endcase
         end
         'b11_0?1_001: begin
-            if ( IR[4] ) begin
-                //
-                `executing("reti")
-            end
-            else begin
-                //            
-                `executing("ret")
-            end
+            // if ( IR[4] ) reti
+            // else         ret
             case ( state )
             S0: begin
                 addrh = SPH;
@@ -912,7 +917,7 @@ module ControlUnit(
             endcase
         end
         'b11_??0_001: begin
-            `executing("pop r16stk")
+            // pop r16stk
             case ( state )
             S0: begin
                 addrh = SPH;
@@ -943,7 +948,7 @@ module ControlUnit(
             endcase
         end
         'b11_101_001: begin
-            `executing("jp hl")
+            // jp hl
             case ( state )
             S0: begin
                 addrh = H;
@@ -955,7 +960,7 @@ module ControlUnit(
             endcase
         end
         'b11_0??_010: begin
-            `executing("jp cond, imm16")
+            // jp cond, imm16
             case ( state )
             S0: begin
                 data_sel = DIN;
@@ -991,7 +996,7 @@ module ControlUnit(
             endcase
         end
         'b11_000_011: begin
-            `executing("jp, imm16")
+            // jp imm16
             case ( state )
                 S0: begin
                 data_sel = DIN;
@@ -1022,7 +1027,7 @@ module ControlUnit(
             endcase
         end
         'b11_0??_100: begin
-            `executing("call cond, imm16")
+            // call cond, imm16
             case ( state )
             S0: begin
                 data_sel = DIN;
@@ -1079,7 +1084,7 @@ module ControlUnit(
             endcase
         end
         'b11_001_101: begin
-            `executing("call imm16")
+            // call imm16
             case ( state )
                 S0: begin
                 data_sel = DIN;
@@ -1128,7 +1133,7 @@ module ControlUnit(
             endcase
         end
         'b11_??0_101: begin
-            `executing("push r16stk")
+            // push r16stk
             case ( state )
             S0: begin
                 addrh = SPH;
@@ -1161,7 +1166,8 @@ module ControlUnit(
             endcase
         end
         'b11_???_110: begin
-            // A, imm8 arithmetic
+            // Block 3 arithmetic
+            // OP a, imm8
             case ( state )
             S0: begin
                 data_sel = DIN;
@@ -1174,7 +1180,8 @@ module ControlUnit(
                 r1 = A;
                 r2 = Z;
                 data_sel = ALU; 
-                if ( IR[5:3] == 'b111 ) begin // compare ( discard result )
+                if ( IR[5:3] == 'b111 ) begin // cp a, imm8
+                    // only used to set flags, discards result
                     alu_op = SUB;
                 end else begin
                     rd = A; 
@@ -1188,7 +1195,7 @@ module ControlUnit(
             endcase
         end
         'b11_100_000: begin
-            `executing("ldh [imm8], a")
+            // ldh [imm8], a
             case ( state )
             S0: begin
                 data_sel = DIN;
@@ -1213,7 +1220,7 @@ module ControlUnit(
             endcase
         end
         'b11_110_000: begin
-            `executing("ldh a, [imm8]")
+            // ldh a, [imm8]
             case ( state )
             S0: begin
                 data_sel = DIN;
@@ -1239,7 +1246,7 @@ module ControlUnit(
             endcase
         end
         'b11_100_010: begin
-            `executing("ldh [c], a")
+            // ldh [c], a
             case ( state )
             S0: begin
                 addrh = CTR;
@@ -1257,7 +1264,7 @@ module ControlUnit(
             endcase
         end
         'b11_110_010: begin
-            `executing("ldh a, [c]")
+            // ldh a, [c]
             case ( state )
             S0: begin
                 addrh = CTR;
@@ -1276,7 +1283,7 @@ module ControlUnit(
             endcase
         end
         'b11_101_010: begin
-            `executing("ld [imm16], a")
+            // ld [imm16], a
             case ( state )
             S0: begin
                 data_sel = DIN;
@@ -1307,7 +1314,7 @@ module ControlUnit(
             endcase
         end
         'b11_111_010: begin
-            `executing("ld, a, [imm16]")
+            // ld a, [imm16]
             case ( state )
             S0: begin
                 data_sel = DIN;
@@ -1339,7 +1346,7 @@ module ControlUnit(
             endcase
         end
         'b11_101_000: begin
-            `executing("add sp, imm8")
+            // add sp, imm8
             case ( state )
             S0: begin
                 data_sel = DIN;
@@ -1358,11 +1365,6 @@ module ControlUnit(
                 next = S2;
             end
             S2: begin
-                // data_sel = ALU;
-                // alu_op = ADC;
-                // rd = SPH;
-                // r1 = SPH;
-                // r2 = CTR;
                 r2 = Z; // so IDU knows if operand was signed
                 idu_op = ADJ;
                 addrh = SPH;
@@ -1380,7 +1382,7 @@ module ControlUnit(
             endcase
         end
         'b11_111_000: begin
-            `executing("ld hl, sp + imm8")
+            // ld hl, sp + imm8
             case ( state )
             S0: begin
                 data_sel = DIN;
@@ -1415,7 +1417,7 @@ module ControlUnit(
             endcase
         end
         'b11_111_001: begin
-            `executing("ld sp, hl")
+            // ld sp, hl
             case ( state )
             S0: begin
                 addrh = H;
@@ -1432,7 +1434,7 @@ module ControlUnit(
             endcase
         end
         'b11_110_011: begin
-            `executing("di")
+            // di
             case ( state )
             S0: begin
                 unset_IME = 1;
@@ -1443,7 +1445,7 @@ module ControlUnit(
             endcase
         end
         'b11_111_011: begin
-            `executing("ei")
+            // ei
             case ( state )
             S0: begin
                 set_IME = 1;
@@ -1454,7 +1456,7 @@ module ControlUnit(
             endcase
         end
         'b11_???_111: begin
-            `executing("rst tgt3")
+            // rst tgt3
             case ( state )
             S0: begin
                 addrh = SPH;
@@ -1494,10 +1496,7 @@ module ControlUnit(
             endcase
         end
         'hCB: begin
-            `ifdef DEBUG
-                if ( en )
-                $display("prefix");
-            `endif
+            // prefix
             prefix_next = 1;
             rd_idu = PC;
             fetch = 1;

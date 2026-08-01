@@ -2,6 +2,9 @@
 module SoC #(
     parameter clk_frq  = 100_000_000
 )  ( 
+    `ifdef DEBUG
+    output wire dbg_break,
+    `endif
     input wire clk,
     input wire rst,
 
@@ -52,6 +55,9 @@ module SoC #(
     );
 
     Core cpu_core (
+        `ifdef DEBUG
+        .dbg_break(dbg_break),
+        `endif
         .clk(clk), .rst(rst), .en(dotclk_en),
         .din(sig_cpu_din), .dout(sig_cpu_dout),
         .addrbus(sig_cpu_addrbus),

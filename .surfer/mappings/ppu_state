@@ -1,0 +1,5 @@
+Name = PPU States
+0[#003F66] Hblank
+1[#007F66] Vblank
+2[#00BF66] OAM Scan
+3[#00FF66] Drawing 

@@ -1,6 +1,90 @@
-use crate::{reg::{Flags, R16, R8}};
+use crate::reg::{Flags, IMM8, R8, R16, IMM16, B3, VEC};
 
 use std::fmt::{Debug, Display, Formatter, Result};
+
+#[derive(strum_macros::Display)]
+enum InstructionTypes {
+	NoOperands(Opcode),
+	OneOperand(Opcode, Operand),
+	TwoOperands(Opcode, Operand, Operand)
+}
+
+#[derive(strum_macros::Display)]
+enum MiscInst {
+	NOP,
+	HALT,
+	STOP,
+	DI,
+	EI
+}
+
+#[derive(strum_macros::Display)]
+enum LoadInst {
+	LD,
+	LDH,
+	POP,
+	PUSH
+}
+
+#[derive(strum_macros::Display)]
+enum ControlInst {
+	JP,
+	JR,
+	CALL,
+	RET,
+	RETI
+}
+
+#[derive(strum_macros::Display)]
+enum ALUInst {
+	ADD,
+	ADC,
+	SUB,
+	SBC,
+	AND,
+	XOR,
+	OR,
+	CP,
+	RLC,
+	RRC,
+	RL,
+	RR,
+	DAA,
+	CPL,
+	SCF,
+	CCF,
+	SL,
+	SR,
+	SRL,
+	SWAP,
+	BIT,
+	RES,
+	SET
+}
+
+enum Opcode {
+	MISC(MiscInst),
+	LOAD(LoadInst),
+	CTRL(ControlInst),
+	ALUI(ALUInst),
+	PREFIX
+}
+
+
+enum Operand {
+	R8(R8),
+	R8A(R8),
+	R16(R16),
+	R16A(R16),
+	IMM8(IMM8),
+	IMM8A(IMM8),
+	IMM16(IMM16),
+	IMM16A(IMM16),
+	B3(B3),
+	TGT3(VEC)
+}
+
+
 
 enum InstTypes {
 	Misc,
@@ -14,21 +98,36 @@ enum InstTypes {
 
 impl Display for InstTypes {
 	fn fmt(&self, f: &mut Formatter) -> Result {
-		write!(f, "?{}?", match self {
-			Misc => "RosyBrown4",
-			ControlFlow => "yellow4",
-			Load8bit => "DarkOliveGreen3",
-			Load16bit => "DarkOliveGreen4",
-			Arith8bit => "DodgerBlue3",
-			Arith16bit => "DodgerBlue4",
-			Invalid => "DarkRed"
-		})
+		// write!(f, "[{}]", match self {
+		// 	Misc => "BROWN",
+		// 	ControlFlow => "YELLOW",
+		// 	Load8bit => "DARK_GREEN",
+		// 	Load16bit => "LIGHT_GREEN",
+		// 	Arith8bit => "LIGHT_BLUE",
+		// 	Arith16bit => "DARK_BLUE",
+		// 	Invalid => "RED"
+		// })
+		write!(f, "")
 	}
 }
 
-struct Instruction {
+pub struct Instruction {
 	mnemonic: String,
 	itype: InstTypes
+}
+
+impl Instruction {
+	pub fn get_color(&self) -> ecolor::Color32 {
+		match self.itype {
+			Misc => 		Color32::BROWN,
+			ControlFlow => 	Color32::YELLOW,
+			Load8bit => 	Color32::DARK_GREEN,
+			Load16bit => 	Color32::LIGHT_GREEN,
+			Arith8bit => 	Color32::LIGHT_BLUE,
+			Arith16bit => 	Color32::DARK_BLUE,
+			Invalid => 		Color32::RED
+		}
+	}
 }
 
 impl Display for Instruction {
@@ -72,6 +171,7 @@ pub struct RunState {
 }
 
 use InstTypes::*;
+use ecolor::Color32;
 
 macro_rules! invalid {
 	($inst:expr) => {
@@ -92,16 +192,13 @@ macro_rules! unimp {
 }
 
 impl RunState {
-	pub fn decode(&mut self, inst: &str) -> String {
+	pub fn decode(&mut self, inst: &str) -> Instruction {
 		match hex_to_u8(inst) {
 			Some(val) 	=> 
-				format!("{}", 
 					if self.prefix 	{self.pdecode_xxxxxxxx(val)}
-					else 			{self.decode_xxxxxxxx(val)}
-				),
-			None 		=> format!("???")
+					else 			{self.decode_xxxxxxxx(val)},
+			None 		=> invalid!(0)
 		}
-		// format!("{}", self.decode_xxxxxxxx(hex_to_u8(inst)))
 	}
 
 	fn decode_xxxxxxxx(&mut self, inst: u8) -> Instruction {

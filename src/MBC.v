@@ -12,10 +12,14 @@ module MBC #(
 
 generate case (mbc_type)
 0: begin : none_mbc
+    /*verilator tracing_off*/
     reg [7:0] ROM [0:(32*1024)-1];
+    /*verilator tracing_on*/
     reg [14:0] rom_addr = 0;
     wire [7:0] rom_dout = ROM[rom_addr];
+    /*verilator tracing_off*/
     reg [7:0] RAM [0:( 8*1024)-1];
+    /*verilator tracing_on*/
     reg [12:0] ram_addr = 0;
     wire [7:0] ram_dout = RAM[ram_addr];
     reg [7:0] ram_din = 0;
