@@ -70,12 +70,12 @@ verilate(gbc_sim
         # --prof-cfuncs
         # --prof-exec
         # --public
-        --trace-max-array 0
-        --trace-max-width 0
+        # --trace-max-array 0
+        # --trace-max-width 0
         # -CFLAGS "-ggdb -O3"
-        # -CFLAGS "-O3"
+        -CFLAGS "-O3"
         -DDEBUG
-        -CFLAGS "-D DEBUG -O3"
+        # -CFLAGS "-D DEBUG -O3"
         # -LDFLAGS "-ggdb"
         # --valgrind
         # --gdb
@@ -84,7 +84,7 @@ verilate(gbc_sim
         # -no-decoration
     OPT_FAST      "-march=native -O3"
     TOP_MODULE    System
-    TRACE_FST
+    # TRACE_FST
     PREFIX        Vgbc
 )
 # Target compile and link profiling options

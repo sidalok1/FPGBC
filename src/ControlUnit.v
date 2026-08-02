@@ -771,7 +771,7 @@ module ControlUnit(
                 // with IME = 0, just moves on to next instruction
                 halt = 1;
                 next = S1;
-                if ( |IF[4:0] ) begin
+                if ( |(IF[4:0] & IE[4:0]) ) begin
                     next = S0;
                     fetch = 1;
                 end

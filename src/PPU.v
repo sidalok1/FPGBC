@@ -150,7 +150,7 @@ module PPU (
     );
     wire [7:0] obj_y = obj_arr[current_obj][0];
     // wire [7:0] obj_x = obj_arr[current_obj][1]; unused
-    wire [7:0] obj_tile = obj_arr[current_obj][2];
+    wire [7:0] obj_tile = (OBJ_SIZE == 0) ? obj_arr[current_obj][2] : obj_arr[current_obj][2] & 8'hFE;
     wire [7:0] obj_attr = obj_arr[current_obj][3];
     wire [7:0] obj_addr = obj_arr[current_obj][4];
     
@@ -326,11 +326,11 @@ module PPU (
                             end
                         else
                             if ( !DMG_mode )
-                                obj_fifo[n] <= obj_fifo_merge[7-n] ?
+                                obj_fifo[n] <= obj_fifo_merge[n] ?
                                     {obj_addr[7:2], obj_high[7-n], obj_low[7-n], obj_attr[2:0], obj_attr[7]} :
                                     obj_fifo[n];
                             else
-                                obj_fifo[n] <= obj_fifo_merge[7-n] ?
+                                obj_fifo[n] <= obj_fifo_merge[n] ?
                                     {obj_addr[7:2], obj_high[7-n], obj_low[7-n], 2'b0, obj_attr[4], obj_attr[7]} :
                                     obj_fifo[n];
                     end
@@ -945,10 +945,10 @@ module PPU (
                     fetcher_obj_merge_fifo: begin
                         obj_valid_n[current_obj] = 0;
                         for ( i = 0; i < 8; i = i + 1 ) begin
-                            if ( i+1 > obj_fifo_len )
-                                obj_fifo_merge_n[i] = 1; // empty fifo slot
-                            else if ( obj_attr[5] == 1 ) begin // x-flip, push in reverse order
-                                if ( !OBJ_PRI_MODE ) begin
+                            if ( obj_attr[5] == 1 ) begin // x-flip, push in reverse order
+                                if ( i+1 > obj_fifo_len )
+                                    obj_fifo_merge_n[i] = 1; // empty fifo slot
+                                else if ( !OBJ_PRI_MODE ) begin
                                     // transparent pixel OR new object has lower oam idx
                                     obj_fifo_merge_n[i] = (obj_fifo[i][5:4] == 2'b0 || obj_addr[5:0] < obj_fifo[i][11:6]) ? 
                                         1 : 0;
@@ -958,13 +958,15 @@ module PPU (
                                 end
                             end
                             else begin
-                                if ( !OBJ_PRI_MODE ) begin
+                                if ( i+1 > obj_fifo_len )
+                                    obj_fifo_merge_n[i] = 1; // empty fifo slot
+                                else if ( !OBJ_PRI_MODE ) begin
                                     // transparent pixel OR new object has lower oam idx
-                                    obj_fifo_merge_n[7-i] = (obj_fifo[7-i][5:4] == 2'b0 || obj_addr[5:0] < obj_fifo[7-i][11:6]) ? 
+                                    obj_fifo_merge_n[i] = (obj_fifo[7-i][5:4] == 2'b0 || obj_addr[5:0] < obj_fifo[7-i][11:6]) ? 
                                         1 : 0;
                                 end
                                 else begin
-                                    obj_fifo_merge_n[7-i] = (obj_fifo[7-i][5:4] == 2'b0) ? 1 : 0;
+                                    obj_fifo_merge_n[i] = (obj_fifo[7-i][5:4] == 2'b0) ? 1 : 0;
                                 end
                             end
                         end

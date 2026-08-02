@@ -30,7 +30,7 @@ using namespace std::chrono;
 #include <memory>
 
 // #define GBDOC_FILE "gbdoc.log"
-#define DEBUG
+// #define DEBUG
 
 // -------------------------------------------------------------------------
 // Display constants
@@ -281,18 +281,19 @@ int main(int argc, char** argv) {
         bool vsync_rising  = (prev_vsync == 0) && (gbc->vsync == 1);
 
         if (vsync_falling) {
-            // one-time raw dump for debugging — write a PPM, viewable in any image viewer
-            // frame++;
-            // if (frame == 100) {
-            //     FILE* f = fopen("./_out/frame.ppm", "wb");
-            //     fprintf(f, "P6\n%d %d\n255\n", GBC_W, GBC_H);
-            //     for (int i = 0; i < GBC_W * GBC_H; i++) {
-            //         uint32_t px = framebuf[i];
-            //         uint8_t r = (px >> 16) & 0xFF, g = (px >> 8) & 0xFF, b = px & 0xFF;
-            //         fwrite(&r, 1, 1, f); fwrite(&g, 1, 1, f); fwrite(&b, 1, 1, f);
-            //     }
-            //     fclose(f);
-            // }
+            #ifdef DEBUG
+            char buf[32];
+            if ( snprintf(buf, 32, "./_out/frame/frame%d.ppm", frame++) > 0 ) {
+                FILE* f = fopen(buf, "wb");
+                fprintf(f, "P6\n%d %d\n255\n", GBC_W, GBC_H);
+                for (int i = 0; i < GBC_W * GBC_H; i++) {
+                    uint32_t px = framebuf[i];
+                    uint8_t r = (px >> 16) & 0xFF, g = (px >> 8) & 0xFF, b = px & 0xFF;
+                    fwrite(&r, 1, 1, f); fwrite(&g, 1, 1, f); fwrite(&b, 1, 1, f);
+                }
+                fclose(f);
+            }
+            #endif
             // VBlank just started: present the completed frame
             in_vblank = true;
 
@@ -305,9 +306,11 @@ int main(int argc, char** argv) {
                     uint32_t* row_dst = reinterpret_cast<uint32_t*>(
                         reinterpret_cast<uint8_t*>(dst) + row * pitch
                     );
-                    const uint32_t* row_src = &framebuf[row * GBC_W];
-                    for (int col = 0; col < GBC_W; col++)
+                    uint32_t* row_src = &framebuf[row * GBC_W];
+                    for (int col = 0; col < GBC_W; col++) {
                         row_dst[col] = row_src[col];
+                        row_src[col] = 0;
+                    }
                 }
                 SDL_UnlockTexture(texture);
             }
