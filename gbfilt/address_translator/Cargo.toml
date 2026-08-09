@@ -1,0 +1,14 @@
+[package]
+name = "address_translator"
+version = "0.1.0"
+edition = "2024"
+
+[lib] 
+crate-type = ["cdylib"]
+
+[dependencies]
+shared_helpers = { path = "../shared_helpers" }
+ecolor = "0.35.0"
+extism-pdk = "1.4.1"
+surfer-translation-types.git = "https://gitlab.com/surfer-project/surfer.git"
+num-bigint = "0.5.1"

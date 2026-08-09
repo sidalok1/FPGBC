@@ -7,6 +7,8 @@ module Timer (
     input wire we, re,
     input wire stop,
     output reg time_intr,
+    input wire dbl_spd,
+    output reg div_apu_event,
     output reg [13:0] system_counter
 );
 
@@ -37,6 +39,8 @@ module Timer (
 
     reg div_tick_reg, div_tick_reg_n;
     reg tima_tick_reg, tima_tick_reg_n;
+    reg apu_stick_reg, apu_stick_reg_n;
+    reg apu_dtick_reg, apu_dtick_reg_n;
 
     always @ ( posedge clk ) begin
         if ( rst ) begin
@@ -46,6 +50,8 @@ module Timer (
             SYS_COUNT_reg <= 0;
             div_tick_reg <= 0;
             tima_tick_reg <= 0;
+            apu_stick_reg <= 0;
+            apu_dtick_reg <= 0;
         end
         else if ( en ) begin
             SYS_COUNT_reg <= SYS_COUNT_reg_n;
@@ -54,11 +60,15 @@ module Timer (
             TAC_reg <= TAC_reg_n;
             div_tick_reg <= div_tick_reg_n;
             tima_tick_reg <= tima_tick_reg_n;
+            apu_stick_reg <= apu_stick_reg_n;
+            apu_dtick_reg <= apu_dtick_reg_n;
         end
     end
 
     wire div_negedge = ~div_tick_reg_n & div_tick_reg;
     wire tima_negedge = ~tima_tick_reg_n & tima_tick_reg;
+    wire apu_snegedge = ~apu_stick_reg_n & apu_stick_reg;
+    wire apu_dnegedge = ~apu_dtick_reg_n & apu_dtick_reg;
 
     always @* begin
         system_counter = SYS_COUNT_reg;
@@ -69,6 +79,9 @@ module Timer (
         TMA_reg_n = TMA_reg;
         TAC_reg_n = TAC_reg;
         tima_tick_reg_n = TIMA_reg[7];
+        apu_stick_reg_n = SYS_COUNT_reg[11];
+        apu_dtick_reg_n = SYS_COUNT_reg[10];
+        div_apu_event = dbl_spd ? apu_dnegedge & en : apu_snegedge & en;
 
         case ( CLOCK_SELECT )
             2'b00: div_tick_reg_n = SYS_COUNT_reg[7];
@@ -92,7 +105,7 @@ module Timer (
             SYS_COUNT_reg_n = 14'b0;
         else if ( we ) begin
             case ( addr )
-                DIV: SYS_COUNT_reg_n = 14'b0;
+                DIV: SYS_COUNT_reg_n = 14'b1;
                 TIMA:begin
                     TIMA_reg_n = din;
                     tima_tick_reg_n = 0;

@@ -1,9 +1,6 @@
-pub mod reg;
-pub mod helpers;
+use shared_helpers::helpers::*;
 
 use std::io::{self, Write};
-
-use crate::helpers::RunState;
 
 fn main() {
     let mut state = RunState{

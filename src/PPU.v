@@ -6,6 +6,7 @@ module PPU (
     output reg [15:0] addr_out,
     input wire [7:0] data_in,
     output reg [7:0] data_out,
+    input wire [7:0] dma_data_in,
     input wire wen, ren,
     input wire dbl_spd,
     output reg wout, rout,
@@ -25,69 +26,85 @@ module PPU (
     //  | LCD_EN    |  WIN_MAP  |  WIN_EN   |  TILE_SEL |   BG_MAP  | OBJ_SIZE  |  OBJ_EN   |   BG_EN   |
     //  |                                              R/W                                              |  
     reg [7:0] LCDC_reg = 8'h91;
+    reg [7:0] LCDC_reg_n;
     wire LCD_EN, WIN_MAP, WIN_EN, TILE_SEL, BG_MAP, OBJ_SIZE, OBJ_EN, BG_EN;
     assign {LCD_EN, WIN_MAP, WIN_EN, TILE_SEL, BG_MAP, OBJ_SIZE, OBJ_EN, BG_EN} = LCDC_reg;
 
     //  |     -     | INTR_LYC  |  INTR_M2  |  INTR_M1  |  INTR_M0  | LYC_STAT  |       LCD_MODE        |
     //  |     U     |                      R/W                      |                 R                 |
     reg [7:0] STAT_reg = 8'b0;
+    reg [7:0] STAT_reg_n;
     wire INTR_LYC_EN, INTR_M2_EN, INTR_M1_EN, INTR_M0_EN;
     assign {INTR_LYC_EN, INTR_M2_EN, INTR_M1_EN, INTR_M0_EN} = STAT_reg[6:3];
     //  |                                              SCY                                              |
     //  |                                              R/W                                              |
-    reg [7:0] SCY_reg = 8'b0;  
+    reg [7:0] SCY_reg = 8'b0;
+    reg [7:0] SCY_reg_n;  
 
     //  |                                              SCX                                              |
     //  |                                              R/W                                              |
     reg [7:0] SCX_reg = 8'b0;
+    reg [7:0] SCX_reg_n;
 
     //  |                                              LY                                               |
     //  |                                               R                                               |
     reg [7:0] LY_reg = 8'b0;
-    reg inc_LY;
+    reg [7:0] LY_reg_n;
+    // reg inc_LY;
 
     //  |                                              LYC                                              |
     //  |                                              R/W                                              |
     reg [7:0] LYC_reg = 8'b0;
+    reg [7:0] LYC_reg_n;
 
     //  |                                              DMA                                              |
     //  |                                              R/W                                              |
     reg [7:0] DMA_reg = 8'b0; // unspecified startup value
+    reg [7:0] DMA_reg_n;
 
     //  |                                              BGP                                              |
     //  |                                              R/W                                              |
     reg [7:0] BGP_reg = 8'b0;
+    reg [7:0] BGP_reg_n;
 
     //  |                                             OBP0                                              |
     //  |                                              R/W                                              |
-    reg [7:0] OBP0_reg = 8'b0; 
+    reg [7:0] OBP0_reg = 8'b0;
+    reg [7:0] OBP0_reg_n; 
 
     //  |                                             OBP1                                              |
     //  |                                              R/W                                              |
-    reg [7:0] OBP1_reg = 8'b0; 
+    reg [7:0] OBP1_reg = 8'b0;
+    reg [7:0] OBP1_reg_n; 
 
     //  |                                               WX                                              |
     //  |                                              R/W                                              |
     reg [7:0] WX_reg = 8'b0;
+    reg [7:0] WX_reg_n;
 
     //  |                                               WY                                              |
     //  |                                              R/W                                              |
     reg [7:0] WY_reg = 8'b0;
+    reg [7:0] WY_reg_n;
 
     //  |     ?     |     ?     |     ?     |     ?     |     ?     | DMG_MODE  |     ?     |     ?     |
     //  |                                                R                                              |
     // writes lock after first write to BANK
     reg [7:0] KEY0_reg = 8'h0;
+    reg [7:0] KEY0_reg_n;
     reg KEY0_locked = 0;
+    reg KEY0_locked_n;
     wire DMG_mode = KEY0_reg[2];
 
     //  |                                              VBK                                              |
     //  |                                              R/W                                              |
     reg [7:0] VBK_reg = 8'hFE; // reads return {7'b1, [VRAM BANK NUMBER]}
+    reg [7:0] VBK_reg_n;
 
     //  | AUTO_INC  |     -     |                              BGP_ADDR                                 |
     //  |                                              R/W                                              |
     reg [7:0] BGPI_reg = 8'b0;
+    reg [7:0] BGPI_reg_n;
     wire BGP_AUTO_INC = BGPI_reg[7];
     wire [5:0] BGP_ADDR = BGPI_reg[5:0];
 
@@ -98,6 +115,7 @@ module PPU (
     //  | AUTO_INC  |     -     |                              OBP_ADDR                                 |
     //  |                                              R/W                                              |
     reg [7:0] OBPI_reg = 8'b0;
+    reg [7:0] OBPI_reg_n;
     wire OBP_AUTO_INC = OBPI_reg[7];
     wire [5:0] OBP_ADDR = OBPI_reg[5:0];
     //  |                                             OBPD                                              |
@@ -109,9 +127,8 @@ module PPU (
     // Online documentation seems to suggest that this register locks after unmapping the boot rom. I am
     // for now keeping it unlocked.
     reg [7:0] OPRI_reg = 8'h0;
+    reg [7:0] OPRI_reg_n;
     wire OBJ_PRI_MODE = OPRI_reg[0];
-
-    reg [1:0] clock_phase = 0, clock_phase_n;
 
     reg [7:0] vram_bank_0 [0:'h1FFF], vram_bank_1 [0:'h1FFF];
     reg vram0_we, vram1_we;
@@ -269,12 +286,15 @@ module PPU (
         // assign DMG_RGB[9] = 8'hFF;
 
         reg [7:0] BGP_RGB [0:63];
+        reg BGP_RGB_we;
         reg [7:0] OBP_RGB [0:63];
+        reg OBP_RGB_we;
 
     localparam h_blank = 2'd0;
         reg hsync_n;
     localparam v_blank = 2'd1;
         reg vsync_n;
+    reg start_DMA = 0, start_DMA_n; 
     reg DMA_state = 0, DMA_state_n;
     reg [7:0] DMA_counter = 0, DMA_counter_n;
 
@@ -395,8 +415,8 @@ module PPU (
 
     always @ ( posedge clk ) begin 
         if ( rst ) begin
-            clock_phase <= 0;
             DMA_state <= 0;
+            start_DMA <= 0;
             DMA_counter <= 0;
             current_mode <= oamScan;
             dot_counter <= 0;
@@ -461,10 +481,41 @@ module PPU (
         end
         else
         if ( en ) begin
-            clock_phase <= clock_phase_n;
-            if ( LCD_EN ) begin
+            LCDC_reg <= LCDC_reg_n;
+            STAT_reg <= STAT_reg_n;
+            SCY_reg <= SCY_reg_n;
+            SCX_reg <= SCX_reg_n;
+            LY_reg <= LY_reg_n;
+            LYC_reg <= LYC_reg_n;
+            DMA_reg <= DMA_reg_n;
+            BGP_reg <= BGP_reg_n;
+            OBP0_reg <= OBP0_reg_n;
+            OBP1_reg <= OBP1_reg_n;
+            WX_reg <= WX_reg_n;
+            WY_reg <= WY_reg_n;
+            KEY0_reg <= KEY0_reg_n;
+            KEY0_locked <= KEY0_locked_n;
+            VBK_reg <= VBK_reg_n;
+            BGPI_reg <= BGPI_reg_n;
+            OBPI_reg <= OBPI_reg_n;
+            OPRI_reg <= OPRI_reg_n;
+
+            if ( cpu_en ) begin
+                start_DMA <= start_DMA_n;
                 DMA_state <= DMA_state_n;
                 DMA_counter <= DMA_counter_n;
+            end
+            if ( oam_we )
+                OAM[oam_addr] <= oam_din;
+            if ( vram0_we )
+                vram_bank_0[vram_addr] <= vram_din;
+            if ( vram1_we )
+                vram_bank_1[vram_addr] <= vram_din;
+            if ( BGP_RGB_we )
+                BGP_RGB[BGP_ADDR] <= data_in;
+            if ( OBP_RGB_we )
+                OBP_RGB[OBP_ADDR] <= data_in;
+            if ( LCD_EN ) begin
                 current_mode <= next_mode;
                 dot_counter <= dot_counter_n;
                 oamScan_substate <= oamScan_substate_n;
@@ -510,61 +561,75 @@ module PPU (
                 hsync <= hsync_n;
                 vsync <= vsync_n;
 
-                if ( inc_LY ) 
-                    LY_reg <= (LY_reg == 153) ? 0 : LY_reg + 1;
+                // if ( inc_LY ) 
+                //     LY_reg <= (LY_reg == 153) ? 0 : LY_reg + 1;
             end
-            if ( oam_we )
-                OAM[oam_addr] <= oam_din;
-            if ( vram0_we )
-                vram_bank_0[vram_addr] <= vram_din;
-            if ( vram1_we )
-                vram_bank_1[vram_addr] <= vram_din;
-            if ( wen ) begin // memory write logic
-                case ( addr_in )
-                    LCDC:   LCDC_reg <=         data_in;
-                    STAT:   STAT_reg[7:3] <=    data_in[7:3];
-                    SCY:    SCY_reg <=          data_in;
-                    SCX:    SCX_reg <=          data_in;
-                    // LY is R/O
-                    LYC:    LYC_reg <=          data_in;
-                    DMA:    DMA_reg <=          data_in < 8'hDF ? data_in : DMA_reg;
-                    BGP:    BGP_reg <=          data_in;
-                    OBP0:   OBP0_reg <=         data_in;
-                    OBP1:   OBP1_reg <=         data_in;
-                    WX:     WX_reg <=           data_in;
-                    WY:     WY_reg <=           data_in;
-                    KEY0: KEY0_reg <= (KEY0_locked) ?
-                                    KEY0_reg :  data_in;
-                    VBK:    VBK_reg[0] <=       data_in[0];
-                    BANK:   KEY0_locked <= 1;
-                    BGPI:   BGPI_reg <=         data_in;
-                    BGPD: begin
-                        if ( current_mode != drawing )
-                            BGP_RGB[BGP_ADDR] <= data_in;
-                        if ( BGP_AUTO_INC && cpu_en )
-                            BGPI_reg[5:0] <= BGPI_reg[5:0] + 1;
-                    end
-                    OBPI:   OBPI_reg <=         data_in;
-                    OBPD: begin
-                        if ( current_mode != drawing )
-                            OBP_RGB[OBP_ADDR] <= data_in;
-                        if ( OBP_AUTO_INC && cpu_en )
-                            OBPI_reg[5:0] <= OBPI_reg[5:0] + 1;
-                    end
-                    OPRI:   OPRI_reg <=         data_in;
-                    default: begin
-                        // This case block is only for control/status registers
-                    end
-                endcase
-            end
+            // if ( wen ) begin // memory write logic
+            //     case ( addr_in )
+            //         LCDC:   LCDC_reg <=         data_in;
+            //         STAT:   STAT_reg[7:3] <=    data_in[7:3];
+            //         SCY:    SCY_reg <=          data_in;
+            //         SCX:    SCX_reg <=          data_in;
+            //         // LY is R/O
+            //         LYC:    LYC_reg <=          data_in;
+            //         DMA:    DMA_reg <=          data_in < 8'hDF ? data_in : DMA_reg;
+            //         BGP:    BGP_reg <=          data_in;
+            //         OBP0:   OBP0_reg <=         data_in;
+            //         OBP1:   OBP1_reg <=         data_in;
+            //         WX:     WX_reg <=           data_in;
+            //         WY:     WY_reg <=           data_in;
+            //         KEY0: KEY0_reg <= (KEY0_locked) ?
+            //                         KEY0_reg :  data_in;
+            //         VBK:    VBK_reg[0] <=       data_in[0];
+            //         BANK:   KEY0_locked <= 1;
+            //         BGPI:   BGPI_reg <=         data_in;
+            //         BGPD: begin
+            //             if ( current_mode != drawing )
+            //                 BGP_RGB[BGP_ADDR] <= data_in;
+            //             if ( BGP_AUTO_INC && cpu_en )
+            //                 BGPI_reg[5:0] <= BGPI_reg[5:0] + 1;
+            //         end
+            //         OBPI:   OBPI_reg <=         data_in;
+            //         OBPD: begin
+            //             if ( current_mode != drawing )
+            //                 OBP_RGB[OBP_ADDR] <= data_in;
+            //             if ( OBP_AUTO_INC && cpu_en )
+            //                 OBPI_reg[5:0] <= OBPI_reg[5:0] + 1;
+            //         end
+            //         OPRI:   OPRI_reg <=         data_in;
+            //         default: begin
+            //             // This case block is only for control/status registers
+            //         end
+            //     endcase
+            // end
         end
     end
 
     always @* begin
         // defaults (if needed)
+        LCDC_reg_n                      = LCDC_reg;
+        STAT_reg_n                      = STAT_reg;
+        SCY_reg_n                       = SCY_reg;
+        SCX_reg_n                       = SCX_reg;
+        LY_reg_n                        = LY_reg;
+        LYC_reg_n                       = LYC_reg;
+        DMA_reg_n                       = DMA_reg;
+        BGP_reg_n                       = BGP_reg;
+        OBP0_reg_n                      = OBP0_reg;
+        OBP1_reg_n                      = OBP1_reg;
+        WX_reg_n                        = WX_reg;
+        WY_reg_n                        = WY_reg;
+        KEY0_reg_n                      = KEY0_reg;
+        KEY0_locked_n                   = KEY0_locked;
+        VBK_reg_n                       = VBK_reg;
+        BGPI_reg_n                      = BGPI_reg;
+        BGP_RGB_we                      = 0;
+        OBPI_reg_n                      = OBPI_reg;
+        OBP_RGB_we                      = 0;
+        OPRI_reg_n                      = OPRI_reg;
+
         stat_intr                       = 0;
         vblank_intr                     = 0;
-        clock_phase_n                   = clock_phase;
         oam_din                         = data_in;
         vram_din                        = data_in;
         
@@ -574,6 +639,7 @@ module PPU (
 
         DMA_state_n                     = DMA_state;
         DMA_counter_n                   = DMA_counter;
+        start_DMA_n                     = 0;
         rout                            = 0;
         wout                            = 0;
         addr_out                        = 0;
@@ -637,34 +703,75 @@ module PPU (
         hsync_n                         = 1;
         vsync_n                         = 1;
 
-        inc_LY                          = 0;
+        // inc_LY                          = 0;
 
 
-        STAT_reg[2] = LY_reg == LYC_reg;
+        STAT_reg_n[2] = LY_reg == LYC_reg;
         if ( INTR_LYC_EN && LY_reg == LYC_reg )
             stat_intr = 1;
         if ( !LCD_EN ) begin
-            STAT_reg[1:0] = 0;
+            STAT_reg_n[1:0] = 0;
         end
         else
-            STAT_reg[1:0] = current_mode;
+            STAT_reg_n[1:0] = current_mode;
 
         addr_in_is_oam = (addr_in >= 16'hFE00) && (addr_in <= 16'hFE9F);
         addr_in_is_vram = (addr_in >= 16'h8000) && (addr_in <= 16'h9FFF);
         // CPU issued writes have lower priority than both ppu and dma. These combinational
         // values can be later overwritten
         if ( wen ) begin
-            if ( addr_in == DMA && data_in < 8'hDF ) begin
-                DMA_state_n = 1;
-                DMA_counter_n = 0;
-                clock_phase_n = 0;
-            end
+            case ( addr_in )
+                LCDC: LCDC_reg_n =      data_in;
+                STAT: STAT_reg_n[7:3] = data_in[7:3];
+                SCY:  SCY_reg_n =       data_in;
+                SCX:  SCX_reg_n =       data_in;
+                // LY is R/O
+                LYC:  LYC_reg_n =       data_in;
+                DMA: begin
+                    // DMA register always written to but should only be triggered with valid
+                    // address
+                    DMA_reg_n =     data_in;
+                    if ( data_in < 8'hDF ) begin
+                        start_DMA_n =   1;
+                    end
+                    else begin
+                        start_DMA_n =   0;
+                    end
+                end
+                BGP:  BGP_reg_n =       data_in;
+                OBP0: OBP0_reg_n =      data_in;
+                OBP1: OBP1_reg_n =      data_in;
+                WX:   WX_reg_n =        data_in;
+                WY:   WY_reg_n =        data_in;
+                KEY0: begin
+                    if ( !KEY0_locked )
+                        KEY0_reg_n =    data_in;
+                    else
+                        KEY0_reg_n =    KEY0_reg;
+                end
+                VBK:  VBK_reg_n[0] =    data_in[0];
+                BANK: KEY0_locked_n =   1;
+                BGPI: BGPI_reg_n =      data_in;
+                BGPD: begin
+                    BGP_RGB_we = 1;
+                    if ( cpu_en && BGP_AUTO_INC )
+                        BGPI_reg_n[5:0] = BGPI_reg[5:0] + 1;
+                end
+                OBPI: OBPI_reg_n =      data_in;
+                OBPD: begin
+                    OBP_RGB_we = 1;
+                    if ( cpu_en && OBP_AUTO_INC )
+                        OBPI_reg_n[5:0] = OBPI_reg[5:0] + 1;
+                end
+                OPRI: OPRI_reg_n =      data_in;
+                default:; //
+            endcase
             if ( addr_in_is_oam )
                 oam_we = 1;
             if ( addr_in_is_vram )
                 if ( VBK_reg[0] == 0 )
                     vram0_we = 1;
-                else
+                else if ( !DMG_mode )
                     vram1_we = 1;
         end
 
@@ -881,7 +988,10 @@ module PPU (
                     fetcher_bgr_read_map,
                     fetcher_win_read_map: begin
                         tile_idx_n = vram0_dout;
-                        tile_attr_n = vram1_dout;
+                        if ( !DMG_mode ) 
+                            tile_attr_n = vram1_dout;
+                        else
+                            tile_attr_n = 8'b0;
                         fetcher_state_n = (bgr_state) ? fetcher_bgr_data_addr : fetcher_win_data_addr;
                     end
                     fetcher_bgr_data_addr,
@@ -1020,7 +1130,7 @@ module PPU (
                     oam_idx_n = 0;
                     oamScan_substate_n = get_y_position;
                     obj_valid_n = 0;
-                    inc_LY = 1;
+                    LY_reg_n = LY_reg + 1;
                     objs_on_scanline_n = 0;
                     
                     if ( LY_reg == 143 ) begin
@@ -1038,10 +1148,13 @@ module PPU (
                 vblank_intr = 1;
                 if ( dot_counter == 455 ) begin
                     dot_counter_n = 0;
-                    inc_LY = 1;
                     if ( LY_reg == 153 ) begin
                         win_y_cond_n = 0;
                         next_mode = oamScan;
+                        LY_reg_n = 0;
+                    end
+                    else begin
+                        LY_reg_n = LY_reg + 1;
                     end
                 end
             end
@@ -1049,37 +1162,29 @@ module PPU (
         endcase
         // DMA has highest priority over mem
         if ( DMA_state ) begin
-            case ( clock_phase )
-                'b00: begin
-                    clock_phase_n = 'b01;
-                    oam_addr = DMA_counter;
-                    addr_out = {DMA_reg, DMA_counter};
-                    rout = 1;
-                    oam_din = data_in;
-                    oam_we = 1;
-                    // DMA operates on same clock as CPU
-                    if ( DMA_counter == 159 ) begin
-                        DMA_state_n = 0;
-                        DMA_counter_n = 0;
-                    end
-                    else begin
-                        DMA_counter_n = DMA_counter + 1;
-                    end
-                end
-                'b01: begin
-                    if ( dbl_spd )
-                        clock_phase_n = 'b00;
-                    else
-                        clock_phase_n = 'b10;
-                end
-                'b10: begin
-                    clock_phase_n = 'b11;
-                end
-                'b11: begin
-                    clock_phase_n = 'b00;
-                end
-                default:; // All cases captured
-            endcase
+            oam_addr = DMA_counter;
+            oam_we = 1;
+            if ( DMA_reg >= 8'h80 && DMA_reg <= 8'h9F ) begin
+                vram_addr = ((13'(DMA_reg) - 13'h0080) << 8) | 13'(DMA_counter);
+                oam_din = VBK_reg[0] == 0 ? vram0_dout : vram1_dout;
+            end
+            else begin
+                rout = 1;
+                addr_out = {DMA_reg, DMA_counter};
+                oam_din = dma_data_in;
+            end
+            if ( DMA_counter == 159 ) begin // state and counter reg only clocked on cpu_en
+                DMA_state_n = 0;
+                DMA_counter_n = 0;
+            end else begin
+                DMA_counter_n = DMA_counter + 1;
+            end
+        end
+        if ( start_DMA ) begin
+            // Technically my DMA implementation can end one cycle early but I fail some of
+            // the mooneye tests when I do that
+            DMA_state_n = 1;
+            DMA_counter_n = 0;
         end
         
         if ( ren ) begin
@@ -1117,12 +1222,12 @@ module PPU (
                 default: begin
                     if ( addr_in >= 16'h8000 && addr_in <= 16'h9FFF ) // VRAM address range 
                         if ( VBK_reg[0] == 1'b0 )
-                            data_out = current_mode != drawing ? vram0_dout : 8'hFF;
+                            data_out = (current_mode != drawing && DMA_state != 1) ? vram0_dout : 8'hFF;
                         else // if ( VBK_reg[0] == 1'b1 )
-                            data_out = current_mode != drawing ? vram1_dout : 8'hFF;
+                            data_out = (current_mode != drawing && DMA_state != 1) ? vram1_dout : 8'hFF;
                     else
                     if ( addr_in >= 16'hFE00 && addr_in <= 16'hFE9F ) // OAM address range
-                        data_out = (current_mode != drawing && current_mode != oamScan) ? 
+                        data_out = (current_mode != drawing && current_mode != oamScan && DMA_state != 1) ? 
                             OAM[oam_addr] : 8'hFF;
                     else
                         data_out = 8'h00;

@@ -8,6 +8,7 @@ module System (
     input wire clk, rst,
     output wire hsync, vsync, de,
     output wire [4:0] r, g, b,
+    output wire [5:0] dac_l, dac_r,
     // input wire done
     input wire sck_i, sdi,
     output wire sck_o, sdo
@@ -34,6 +35,7 @@ module System (
         .hsync(hsync), .vsync(vsync), .de(pix_de),
         .dotclk_en(dotclk),
         .r(r), .g(g), .b(b),
+        .dac_l(dac_l), .dac_r(dac_r),
         .sck_i(sck_i), .sck_o(sck_o),
         .sdi(sdi), .sdo(sdo)
     );

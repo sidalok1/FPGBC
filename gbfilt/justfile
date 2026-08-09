@@ -1,0 +1,24 @@
+PLUGIN_DIR := "../.surfer/translators"
+PLUGIN_SRC := "target/wasm32-unknown-unknown/release"
+
+[default]
+all: plugins filter_process
+
+plugins: instruction_translator address_translator
+
+instruction_translator: translator_dir
+    cargo build -p instruction_translator --target wasm32-unknown-unknown --release
+    cp {{PLUGIN_SRC}}/instruction_translator.wasm {{PLUGIN_DIR}}/
+
+address_translator: translator_dir
+    cargo build -p address_translator --target wasm32-unknown-unknown --release
+    cp {{PLUGIN_SRC}}/address_translator.wasm {{PLUGIN_DIR}}/
+
+[private]
+translator_dir:
+    mkdir -p {{PLUGIN_DIR}}
+
+filter_process: InstructionFilter
+
+InstructionFilter:
+    cargo build -p InstructionFilter --release

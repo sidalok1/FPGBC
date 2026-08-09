@@ -265,7 +265,7 @@ module ControlUnit(
             end
             S5: begin
                 rd_idu = PC;
-                idu_op = ZER;
+                // idu_op = ZER;
                 ack_IF_n[next_interrupt] = 1;
                 unset_IME = 1;
                 fetch = 1;
@@ -1489,6 +1489,7 @@ module ControlUnit(
                 addrh = CTR;
                 ctr = 8'b0;
                 addrl = Z;
+                // idu_op = ZER;
                 rd_idu = PC;
                 fetch = 1;
             end

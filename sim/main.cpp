@@ -29,12 +29,56 @@
 using namespace std::chrono;
 #include <memory>
 
+#include <condition_variable>
+#include <mutex>
+#include <atomic>
+#include <queue>
+#include <thread>
+
+// Python snippet using scipy.signal to design filters
+/* 
+from scipy import signal
+filt = signal.iirdesign (
+    wp = [20, 16e3],
+    ws = [1, 20e3],
+    gpass = 3,
+    gstop = 20,
+    analog = False,
+    output = 'sos',
+    fs = 4.1943e6
+)
+*/
+
+class Biquad {
+    double b0, b1, b2;
+    double     a1, a2;
+    double     x1, x2;
+    double     y1, y2;
+public:
+    Biquad() = delete;
+    Biquad(double b0, double b1, double b2, double a1, double a2);
+    double filter(double x0);
+};
+
+#define SECTION0 Biquad( 0.00247977,-0.00495772, 0.00247977,-1.99753546, 0.998065  )
+#define SECTION1 Biquad( 1.0       , 0.0       ,-1.0       ,-1.99308878, 0.99309236)
+#define SECTION2 Biquad( 1.0       ,-1.99999998, 1.0       ,-1.99998686, 0.99998688)
+#define SECTION3 Biquad( 1.0       , 0.0       , 0.0       , 0.0       , 0.0       )
+
 // #define GBDOC_FILE "gbdoc.log"
 // #define DEBUG
+// #define BREAKPOINT
+// #define TIME
+// #define THREAD_AUDIO
 
 // -------------------------------------------------------------------------
-// Display constants
+// Constants
 // -------------------------------------------------------------------------
+static constexpr double CLOCK_FRQ = 4.194304e6;
+
+#ifdef TIME
+static constexpr int CYCLE_INTERVAL = 1000;
+#endif
 static constexpr int GBC_W       = 160;   // GBC visible pixels per line
 static constexpr int GBC_H       = 144;   // GBC visible lines
 // static constexpr int SCALE       = 1;     // Window scale factor
@@ -45,6 +89,25 @@ static constexpr int GBC_H       = 144;   // GBC visible lines
 static constexpr uint64_t GB_SEC = 4e6;
 static constexpr uint64_t MAX_CYCLES = GB_SEC * 120;
 
+static constexpr double cycles_per_sample = CLOCK_FRQ / 44.1e3;
+
+static inline float d2a(uint8_t d) {
+    // Maps the 6-bit dac values to analog values with 6'h00 -> -1.0 and 6'h3F ~> 1.0
+    return ((static_cast<float>(d)/64.0f)-0.5f)*-2.0f;
+}
+#ifdef THREAD_AUDIO
+struct audioFrame {
+    uint8_t l;
+    uint8_t r;
+};
+
+static std::queue<audioFrame> q;
+static std::mutex m;
+static std::condition_variable c;
+static std::atomic<bool> keepRunning(true);
+
+static void audio_thread(SDL_AudioStream* audio);
+#endif
 // -------------------------------------------------------------------------
 // RGB555 -> RGB888 expansion helper
 // -------------------------------------------------------------------------
@@ -55,10 +118,12 @@ static inline uint8_t expand5to8(uint8_t v5) {
 // main
 // -------------------------------------------------------------------------
 int main(int argc, char** argv) {
-    // auto start = high_resolution_clock::now();
+    #ifdef TIME
+    auto start = high_resolution_clock::now();
+    #endif
     // --- Verilator setup ---------------------------------------------------
     const std::unique_ptr<VerilatedContext> ctx{new VerilatedContext};
-    float clk_period_half = ((1.0/4.194304e6)*std::pow(10, ctx->timeprecision()))/2.0;
+    float clk_period_half = ((1.0/CLOCK_FRQ)*std::pow(10, ctx->timeprecision()))/2.0;
     // VerilatedContext* ctx = new VerilatedContext;
     ctx->commandArgs(argc, argv);
 
@@ -90,7 +155,7 @@ int main(int argc, char** argv) {
     gbdoc_fstream << std::hex << std::setfill('0') << std::uppercase;
     #endif
     // --- SDL3 setup --------------------------------------------------------
-    if (!SDL_Init(SDL_INIT_VIDEO)) {
+    if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO)) {
         SDL_Log("SDL_Init failed: %s", SDL_GetError());
         return 1;
     }
@@ -131,6 +196,32 @@ int main(int argc, char** argv) {
     }
     SDL_SetTextureScaleMode(texture, SDL_SCALEMODE_NEAREST);
 
+    SDL_AudioSpec spec;
+    spec.format = SDL_AUDIO_F32;
+    spec.channels = 2;
+    spec.freq = int(44.1e3);
+
+    SDL_AudioStream* audio = SDL_OpenAudioDeviceStream(
+        SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, nullptr, nullptr
+    );
+    if (!audio) {
+        SDL_Log("SDL_OpenAudioDeviceStream failed: %s", SDL_GetError());
+        return 1;
+    }
+    SDL_ResumeAudioStreamDevice(audio);
+    #ifdef THREAD_AUDIO
+    std::thread audio_worker(audio_thread, audio);
+    #else
+    double sample_accumulator = 0.0;
+
+    Biquad  l0 = SECTION0, r0 = SECTION0,
+            l1 = SECTION1, r1 = SECTION1,
+            l2 = SECTION2, r2 = SECTION2,
+            l3 = SECTION3, r3 = SECTION3;
+
+    float samples[256][2];
+    uint8_t sample_idx = 0;
+    #endif
     ctx->traceEverOn(true);
 
     // Pixel buffer - we write here and upload to the texture each VSync
@@ -169,12 +260,13 @@ int main(int argc, char** argv) {
     }
     gbc->rst = 0;
     
-    // auto end = high_resolution_clock::now();
-    // auto duration = duration_cast<microseconds>(end - start);
-    // std::cout   << "Initialization time: "
-    //             << duration.count()
-    //             << " us" << std::endl;
-
+    #ifdef TIME
+    auto end = high_resolution_clock::now();
+    auto duration = duration_cast<microseconds>(end - start);
+    std::cout   << "Initialization time: "
+                << duration.count()
+                << " us" << std::endl;
+    #endif
     
 
     // --- Main simulation loop ----------------------------------------------
@@ -188,9 +280,11 @@ int main(int argc, char** argv) {
     // while (running) {
 
         // Tick the clock (two eval() calls = one full master clock cycle)
-        // if ( cycle % CYCLE_INTERVAL == 0 ){
-        //     start = high_resolution_clock::now();
-        // }
+        #ifdef TIME
+        if ( cycle % CYCLE_INTERVAL == 0 ){
+            start = high_resolution_clock::now();
+        }
+        #endif
         gbc->clk = 0; gbc->eval();
         #ifdef GBDOC_FILE
         if ( BANKL == 1 && PHASE == 0 && FETCH == 1 ){
@@ -262,18 +356,37 @@ int main(int argc, char** argv) {
         #endif
         ctx->timeInc(clk_period_half); seconds += 1/4e6;
         gbc->clk = 1; gbc->eval();
-        // if ( cycle % CYCLE_INTERVAL == 0 ){
-        //     end = high_resolution_clock::now();
-        //     duration = duration_cast<microseconds>(end - start);
-        //     std::cout   << "Cycle " << cycle << " time: "
-        //                 << duration.count()
-        //                 << " us" << std::endl;            
-        //     start = high_resolution_clock::now();
-        // }
+        #ifdef TIME
+        if ( cycle % CYCLE_INTERVAL == 0 ){
+            end = high_resolution_clock::now();
+            duration = duration_cast<microseconds>(end - start);
+            std::cout   << "Cycle " << cycle << " time: "
+                        << duration.count()
+                        << " us" << std::endl;            
+            start = high_resolution_clock::now();
+        }
+        #endif
         ctx->timeInc(clk_period_half); seconds += 1/4e6;
 
         // --- Decode outputs on the rising edge -------------------------
-        
+        #ifdef THREAD_AUDIO
+        {
+            std::lock_guard<std::mutex> lock(m);
+            q.push(audioFrame{gbc->dac_l, gbc->dac_r});
+        }
+        c.notify_one();
+        #else
+        double l = l3.filter(l2.filter(l1.filter(l0.filter(d2a(gbc->dac_l)))));
+        double r = r3.filter(r2.filter(r1.filter(r0.filter(d2a(gbc->dac_l)))));
+        if ( sample_accumulator++ >= cycles_per_sample ) {
+            sample_accumulator -= cycles_per_sample;
+            samples[sample_idx  ][0] = static_cast<float>(l);
+            samples[sample_idx++][1] = static_cast<float>(r);
+            if ( sample_idx == 0 ) {
+                SDL_PutAudioStreamData(audio, samples, sizeof(samples));
+            }
+        }
+        #endif
 
         // Detect falling edge of vsync (active-low) = start of VBlank
         bool vsync_falling = (prev_vsync == 1) && (gbc->vsync == 0);
@@ -412,15 +525,45 @@ int main(int argc, char** argv) {
                     running = false;
             }
         }
-        
-        
-        // if ( cycle % CYCLE_INTERVAL == 0 ){
-        //     end = high_resolution_clock::now();
-        //     duration = duration_cast<microseconds>(end - start);
-        //     std::cout   << "Decode " << cycle << " time: "
-        //                 << duration.count()
-        //                 << " us" << std::endl;
-        // }
+        #ifdef BREAKPOINT
+        if ( gbc->dbg_break ) {
+            SDL_Log("Breakpoint hit");
+            SDL_Event e;
+            bool wait = true;
+            while (wait) {
+                if (SDL_WaitEvent(&e)) {
+                    if (e.type == SDL_EVENT_QUIT) {
+                        done = true;
+                        running = false;
+                        wait = false;
+                    };
+                    if (e.type == SDL_EVENT_KEY_DOWN) {
+                        switch (e.key.key)
+                        {
+                        case SDLK_ESCAPE:
+                            running = false;
+                            done = true;
+                        case SDLK_SPACE:
+                            wait = false;
+                            break;
+                        default:
+                            // continue
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        # endif
+        #ifdef TIME
+        if ( cycle % CYCLE_INTERVAL == 0 ){
+            end = high_resolution_clock::now();
+            duration = duration_cast<microseconds>(end - start);
+            std::cout   << "Decode " << cycle << " time: "
+                        << duration.count()
+                        << " us" << std::endl;
+        }
+        #endif
         cycle++;
     }
     std::cout << std::endl;
@@ -455,8 +598,11 @@ int main(int argc, char** argv) {
     gbc->final();
 
     ctx->statsPrintSummary();
-
-    
+    #ifdef THREAD_AUDIO
+    keepRunning.store(false);
+    c.notify_all();
+    audio_worker.join();
+    #endif
 
     SDL_DestroyTexture(texture);
     SDL_DestroyRenderer(renderer);
@@ -465,3 +611,56 @@ int main(int argc, char** argv) {
 
     return 0;
 }
+
+Biquad::Biquad(double b0, double b1, double b2, double a1, double a2) : 
+    b0(b0), b1(b1), b2(b2), a1(a1), a2(a2) {
+    x1 = 0;
+    x2 = 0;
+    y1 = 0;
+    y2 = 0;
+}
+
+inline double Biquad::filter(double x0) {
+    double y0 = (b0*x0) + (b1*x1) + (b2*x2) - (a1*y1) - (a2*y2);
+    x2 = x1; x1 = x0;
+    y2 = y1; y1 = y0;
+    return y0;
+}
+
+#ifdef THREAD_AUDIO
+void audio_thread(SDL_AudioStream *audio) {
+    double sample_accumulator = 0.0;
+
+    Biquad  l0 = SECTION0, r0 = SECTION0,
+            l1 = SECTION1, r1 = SECTION1,
+            l2 = SECTION2, r2 = SECTION2,
+            l3 = SECTION3, r3 = SECTION3;
+
+    float samples[256][2];
+    uint8_t sample_idx = 0;
+
+
+    while (keepRunning.load()) {
+        audioFrame f;
+        {
+            std::unique_lock<std::mutex> lock(m);
+            c.wait(lock, []() { return !q.empty() || !keepRunning.load(); });
+            if ( !keepRunning.load() ) {
+                break;
+            }
+            f = q.front();
+            q.pop();  
+        }
+        double l = l3.filter(l2.filter(l1.filter(l0.filter(d2a(f.l)))));
+        double r = r3.filter(r2.filter(r1.filter(r0.filter(d2a(f.r)))));
+        if ( sample_accumulator++ >= cycles_per_sample ) {
+            sample_accumulator -= cycles_per_sample;
+            samples[sample_idx  ][0] = static_cast<float>(l);
+            samples[sample_idx++][1] = static_cast<float>(r);
+            if ( sample_idx == 0 ) {
+                SDL_PutAudioStreamData(audio, samples, sizeof(samples));
+            }
+        }
+    }
+}
+#endif

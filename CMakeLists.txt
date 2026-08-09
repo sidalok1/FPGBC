@@ -33,24 +33,29 @@ endif()
 # ---------------------------------------------------------------------------
 add_executable(gbc_sim sim/main.cpp)
 
+# set(HDL_SOURCES
+#     src/System.v
+#     src/MBC.v
+#     src/SoC.v
+#     src/ClockDivider.v
+#     src/PPU.v
+#     src/MAC.v
+#     src/Core.v
+#     src/ControlUnit.v
+#     src/ALU.v
+#     src/RegisterFile.v
+#     src/IDU.v
+#     src/CondCheck.v
+#     src/PriorityEncoder.v
+#     src/PriorityEncoder5.v
+#     src/PriorityEncoder10.v
+#     src/Serial.v
+#     src/Timer.v
+#     src/APU.v
+# )
+
 set(HDL_SOURCES
     src/System.v
-    src/MBC.v
-    src/SoC.v
-    src/ClockDivider.v
-    src/PPU.v
-    src/MAC.v
-    src/Core.v
-    src/ControlUnit.v
-    src/ALU.v
-    src/RegisterFile.v
-    src/IDU.v
-    src/CondCheck.v
-    src/PriorityEncoder.v
-    src/PriorityEncoder5.v
-    src/PriorityEncoder10.v
-    src/Serial.v
-    src/Timer.v
 )
 
 verilate(gbc_sim
@@ -59,6 +64,8 @@ verilate(gbc_sim
         --x-assign fast --x-initial fast --no-assert
         -y "include"
         -y "roms" 
+        -y "src"
+        -y "src/APU_Channels"
         # --threads 1
         -Wall 
         -Wno-EOFNEWLINE
@@ -66,6 +73,7 @@ verilate(gbc_sim
         -Wno-UNSIGNED
         -Wno-PROCASSINIT
         -Wno-WIDTHTRUNC
+        -Wno-TIMESCALEMOD
         --report-unoptflat
         # --prof-cfuncs
         # --prof-exec
@@ -74,7 +82,7 @@ verilate(gbc_sim
         # --trace-max-width 0
         # -CFLAGS "-ggdb -O3"
         -CFLAGS "-O3"
-        -DDEBUG
+        # -DDEBUG
         # -CFLAGS "-D DEBUG -O3"
         # -LDFLAGS "-ggdb"
         # --valgrind

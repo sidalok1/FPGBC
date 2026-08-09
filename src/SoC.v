@@ -19,6 +19,8 @@ module SoC #(
     output wire de,
     output wire dotclk_en,
 
+    output wire [5:0] dac_l, dac_r,
+
     input wire sck_i, sdi,
     output wire sck_o, sdo
 );
@@ -33,7 +35,6 @@ module SoC #(
     wire sig_cpu_stop;
 
     wire [15:0] sig_ppu_addro;
-    wire [7:0] sig_ppu_din;
     wire [7:0] sig_ppu_dout;
     wire sig_ppu_wout, sig_ppu_rout;
 
@@ -42,8 +43,10 @@ module SoC #(
     wire [7:0] sig_serial_dout;
 
     wire [7:0] sig_timer_dout;
-
+    wire sig_div_apu_event;
     wire [13:0] sig_system_counter;
+
+    wire [7:0] sig_apu_dout;
 
     ClockDivider #(
         .I_CLK_FRQ(clk_frq),
@@ -71,7 +74,7 @@ module SoC #(
     PPU pixel_processing_unit (
         .clk(clk), .rst(rst), .en(dotclk_en), .cpu_en(sig_cpu_en),
         .addr_in(sig_cpu_addrbus), .addr_out(sig_ppu_addro),
-        .data_in(sig_ppu_din), .data_out(sig_ppu_dout),
+        .data_in(sig_cpu_dout), .data_out(sig_ppu_dout), .dma_data_in(sig_mac_ppu_din),
         .wen(sig_cpu_we), .ren(sig_cpu_re),
         .dbl_spd(sig_cpu_dbl_spd),
         .wout(sig_ppu_wout),
@@ -104,10 +107,17 @@ module SoC #(
         .clk(clk), .en(sig_cpu_en), .rst(rst),
         .addr(sig_cpu_addrbus), .din(sig_cpu_dout), .dout(sig_timer_dout),
         .we(sig_cpu_we), .re(sig_cpu_re), .stop(sig_cpu_stop), 
-        .time_intr(sig_cpu_intr_req[2]), .system_counter(sig_system_counter)
+        .time_intr(sig_cpu_intr_req[2]), .system_counter(sig_system_counter),
+        .dbl_spd(sig_cpu_dbl_spd), .div_apu_event(sig_div_apu_event)
     );
 
-    assign sig_cpu_din = sig_ppu_dout | sig_mac_cpu_din | sig_serial_dout | sig_timer_dout;
-    assign sig_ppu_din = sig_ppu_rout ? sig_mac_ppu_din : sig_cpu_dout;
+    APU audio_processing_unit (
+        .clk(clk), .en(dotclk_en), .rst(rst),
+        .addr(sig_cpu_addrbus), .din(sig_cpu_dout), .dout(sig_apu_dout),
+        .we(sig_cpu_we), .re(sig_cpu_re), .div_apu_event(sig_div_apu_event),
+        .dac_left(dac_l), .dac_right(dac_r)
+    );
+
+    assign sig_cpu_din = sig_ppu_dout | sig_mac_cpu_din | sig_serial_dout | sig_timer_dout | sig_apu_dout;
 
 endmodule

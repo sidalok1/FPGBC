@@ -45,6 +45,7 @@ module MAC(
     reg ppu_addr_in_wram, cpu_addr_in_wram;
     reg ppu_addr_in_wram_banked, cpu_addr_in_wram_banked;
     reg ppu_addr_in_cart, cpu_addr_in_cart;
+    reg ppu_addr_in_echo, cpu_addr_in_echo, ppu_addr_echo_banked, cpu_addr_echo_banked;
 
     initial begin
         $readmemh("roms/testboot.mem", bootrom);
@@ -95,18 +96,22 @@ module MAC(
         ppu_addr_in_wram = ppu_addr >= 16'hC000 && ppu_addr <= 16'hCFFF;
         cpu_addr_in_wram_banked = cpu_addr >= 16'hD000 && cpu_addr <= 16'hDFFF;
         ppu_addr_in_wram_banked = ppu_addr >= 16'hD000 && ppu_addr <= 16'hDFFF;
+        cpu_addr_in_echo = cpu_addr >= 16'hE000 && cpu_addr <= 16'hEFFF;
+        ppu_addr_in_echo = ppu_addr >= 16'hE000 && ppu_addr <= 16'hEFFF;
+        cpu_addr_echo_banked = cpu_addr >= 16'hF000 && cpu_addr <= 16'hFDFF;
+        ppu_addr_echo_banked = ppu_addr >= 16'hF000 && ppu_addr <= 16'hFDFF;
         cpu_addr_in_cart =  (cpu_addr >= 16'h0000 && cpu_addr <= 16'h7FFF) ||
                             (cpu_addr >= 16'hA000 && cpu_addr <= 16'hBFFF);
         ppu_addr_in_cart =  (ppu_addr >= 16'h0000 && ppu_addr <= 16'h7FFF) ||
                             (ppu_addr >= 16'hA000 && ppu_addr <= 16'hBFFF);
 
-        if ( cpu_addr_in_wram ) begin
+        if ( cpu_addr_in_wram || cpu_addr_in_echo ) begin
             wram_we = cpu_we;
-            wram_addr = cpu_addr - 16'hC000;
+            wram_addr = cpu_addr_in_echo ? cpu_addr - 16'hE000 : cpu_addr - 16'hC000;
             wram_bank_sel = 0;
         end
-        else if ( cpu_addr_in_wram_banked ) begin
-            wram_addr = cpu_addr - 16'hD000;
+        else if ( cpu_addr_in_wram_banked || cpu_addr_echo_banked ) begin
+            wram_addr = cpu_addr_echo_banked ? cpu_addr - 16'hF000 : cpu_addr - 16'hD000;
             wram_we = cpu_we;
             wram_bank_sel = (SVBK_reg[2:0] == 0) ? 1 : SVBK_reg[2:0];
         end
@@ -125,7 +130,7 @@ module MAC(
                 cpu_din = BANK_reg;
             else if ( cpu_addr == SVBK )
                 cpu_din = SVBK_reg;
-            else if ( cpu_addr_in_wram || cpu_addr_in_wram_banked ) begin
+            else if ( cpu_addr_in_wram || cpu_addr_in_wram_banked || cpu_addr_in_echo || cpu_addr_echo_banked ) begin
                 cpu_din = wram_dout;
             end
             else if ( cpu_addr_in_cart ) begin
@@ -137,7 +142,7 @@ module MAC(
         end
 
         if ( cpu_we ) begin
-            if ( cpu_addr_in_wram || cpu_addr_in_wram_banked ) begin
+            if ( cpu_addr_in_wram || cpu_addr_in_wram_banked || cpu_addr_in_echo || cpu_addr_echo_banked ) begin
                 wram_we = 1;
                 wram_din = cpu_dout;
             end
@@ -151,16 +156,16 @@ module MAC(
         
 
         if ( ppu_re ) begin
-            if ( ppu_addr_in_wram ) begin
+            if ( ppu_addr_in_wram || ppu_addr_in_echo ) begin
                 wram_we = 0;
                 wram_bank_sel = 0;
-                wram_addr = ppu_addr - 16'hC000;
+                wram_addr = ppu_addr_in_echo ? ppu_addr - 16'hE000 : ppu_addr - 16'hC000;
                 ppu_din = wram_dout;
             end
-            else if ( ppu_addr_in_wram_banked ) begin
+            else if ( ppu_addr_in_wram_banked || ppu_addr_echo_banked ) begin
                 wram_we = 0;
                 wram_bank_sel = SVBK_reg[2:0] == 0 ? 1 : SVBK_reg[2:0];
-                wram_addr = ppu_addr - 16'hD000;
+                wram_addr = ppu_addr_echo_banked ? ppu_addr - 16'hF000 : ppu_addr - 16'hD000;
                 ppu_din = wram_dout;
             end
             else if ( ppu_addr_in_cart ) begin

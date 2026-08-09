@@ -202,8 +202,8 @@ module Core(
         else if ( sig_readmem ) begin
             // re = 0;
             case ( addrbus )
-                IF:     databus = IF_reg;
-                IE:     databus = IE_reg;
+                IF:     databus = IF_reg | 8'hE0;
+                IE:     databus = IE_reg | 8'hE0;
                 KEY1:   databus = KEY1_reg;
                 default: begin
                     if ( addr_in_hram ) begin

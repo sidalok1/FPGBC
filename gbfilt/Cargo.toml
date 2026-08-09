@@ -1,14 +1,7 @@
-[package]
-name = "gbfilt"
-version = "0.1.0"
-edition = "2024"
-
-[lib]
-crate-type = ["cdylib"]
-
-[dependencies]
-ecolor = "0.35.0"
-extism-pdk = "1.4.1"
-strum = "0.28.0"
-strum_macros = "0.28.0"
-surfer-translation-types.git = "https://gitlab.com/surfer-project/surfer.git"
+[workspace]
+members = [
+    "shared_helpers",
+    "instruction_filter",
+    "instruction_translator",
+    "address_translator"
+]

@@ -1,0 +1,9 @@
+[package]
+name = "shared_helpers"
+version = "0.1.1"
+edition = "2024"
+
+[dependencies]
+strum = "0.28.0"
+strum_macros = "0.28.0"
+ecolor = "0.35.0"

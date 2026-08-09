@@ -3,6 +3,17 @@
 version = 4
 
 [[package]]
+name = "address_translator"
+version = "0.1.0"
+dependencies = [
+ "ecolor",
+ "extism-pdk",
+ "num-bigint 0.5.1",
+ "shared_helpers",
+ "surfer-translation-types",
+]
+
+[[package]]
 name = "anyhow"
 version = "1.0.104"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -169,17 +180,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "gbfilt"
-version = "0.1.0"
-dependencies = [
- "ecolor",
- "extism-pdk",
- "strum",
- "strum_macros",
- "surfer-translation-types",
-]
-
-[[package]]
 name = "hashbrown"
 version = "0.17.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -205,6 +205,25 @@ checksum = "d466e9454f08e4a911e14806c24e16fba1b4c121d1ea474396f396069cf949d9"
 dependencies = [
  "equivalent",
  "hashbrown",
+]
+
+[[package]]
+name = "instruction_filter"
+version = "0.1.0"
+dependencies = [
+ "shared_helpers",
+]
+
+[[package]]
+name = "instruction_translator"
+version = "0.1.0"
+dependencies = [
+ "ecolor",
+ "extism-pdk",
+ "shared_helpers",
+ "strum",
+ "strum_macros",
+ "surfer-translation-types",
 ]
 
 [[package]]
@@ -257,7 +276,7 @@ version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "35bd024e8b2ff75562e5f34e7f4905839deb4b22955ef5e73d2fea1b9813cb23"
 dependencies = [
- "num-bigint",
+ "num-bigint 0.4.8",
  "num-complex",
  "num-integer",
  "num-iter",
@@ -274,6 +293,16 @@ dependencies = [
  "num-integer",
  "num-traits",
  "serde",
+]
+
+[[package]]
+name = "num-bigint"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "93e7820bc0a80a0238e650327316f929ba18d5be054b647490a3a6a339f3e7c0"
+dependencies = [
+ "num-integer",
+ "num-traits",
 ]
 
 [[package]]
@@ -311,7 +340,7 @@ version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f83d14da390562dca69fc84082e73e548e1ad308d24accdedd2720017cb37824"
 dependencies = [
- "num-bigint",
+ "num-bigint 0.4.8",
  "num-integer",
  "num-traits",
  "serde",
@@ -471,6 +500,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "shared_helpers"
+version = "0.1.1"
+dependencies = [
+ "ecolor",
+ "strum",
+ "strum_macros",
+]
+
+[[package]]
 name = "smallvec"
 version = "1.15.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -497,7 +535,7 @@ dependencies = [
 [[package]]
 name = "surfer-translation-types"
 version = "0.7.0"
-source = "git+https://gitlab.com/surfer-project/surfer.git#2c6e138d271a7b29b453a85dc77397383a8ff52d"
+source = "git+https://gitlab.com/surfer-project/surfer.git#dffac6874d38a6b509371887fab5057d9392d23e"
 dependencies = [
  "derive_more",
  "ecolor",

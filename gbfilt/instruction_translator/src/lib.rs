@@ -3,9 +3,7 @@ pub use surfer_translation_types::plugin_types::TranslateParams;
 use surfer_translation_types::{
     TranslationPreference, TranslationResult, ValueKind, ValueRepr, VariableInfo, VariableMeta, VariableValue
 };
-pub mod helpers;
-pub mod reg;
-use crate::helpers::RunState;
+use shared_helpers::helpers::RunState;
 // use std::sync::Mutex;
 
 // static COUNT: Mutex<i32> = Mutex::new(0);
