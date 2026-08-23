@@ -717,7 +717,7 @@ module PPU (
 
 
         STAT_reg_n[2] = LY_reg == LYC_reg;
-        if ( INTR_LYC_EN && LY_reg == LYC_reg )
+        if ( INTR_LYC_EN == 1 && LY_reg == LYC_reg )
             stat_intr = 1;
         if ( !LCD_EN ) begin
             STAT_reg_n[1:0] = 0;
@@ -803,7 +803,7 @@ module PPU (
         obj_trigger = obj_priority_valid;
         obj_height = (OBJ_SIZE == 0) ? 8 : 16;
         for ( i = 0; i < 10; i = i + 1 )
-            if ( obj_arr[i][1] == output_x )
+            if ( obj_arr[i][1] == output_x - (SCX_reg & 8'h7) )
                 obj_x_hit[i] = 1;
             else
                 obj_x_hit[i] = 0;
@@ -814,11 +814,11 @@ module PPU (
                                         data_base + (13'(tile_idx) * 16);
         if ( bgr_state ) begin
             map_base = (BG_MAP == 0) ? 13'h1800 : 13'h1C00;
-            pix_x = (fetch_counter*8) + SCX_reg;
+            pix_x = (fetch_counter*8) + (SCX_reg & ~8'h07);
             pix_y = LY_reg + SCY_reg;
         end
-        else 
-        if ( win_state ) begin
+        else begin
+        // if ( win_state ) begin
             map_base = (WIN_MAP == 0) ? 13'h1800 : 13'h1C00;
             pix_x = win_x;
             pix_y = win_y;
@@ -919,7 +919,13 @@ module PPU (
                     // obj_with_priority may get set to 4'hF while data is yet to be pushed to obj_fifo
                     // if ( win_state )
                     //     win_x_n = win_x + 1;
-                    de2_n = output_x < 168 ? 1 : 0;
+                    if ( output_x < (8 + (SCX_reg & 8'h7)) || output_x >= (168 + (SCX_reg & 8'h7)) ) begin
+                        de2_n = 0;
+                    end
+                    else begin
+                        de2_n = 1;
+                    end
+                    // de2_n = output_x < 168 ? 1 : 0;
                     output_x_n = output_x + 1;
                     bgr_fifo_read = 1;
                     
@@ -993,7 +999,7 @@ module PPU (
                 r_n = rgb_low[4:0];
                 g_n = {rgb_high[1:0], rgb_low[7:5]};
                 b_n = rgb_high[6:2];
-                if ( output_x >= 168 && !(de0 | de1 | de2) ) begin
+                if ( output_x >= (168 + (SCX_reg & 8'h7)) && !(de0 | de1 | de2) ) begin
                     // Wait for output pipeline to empty
                     next_mode = h_blank;
                 end

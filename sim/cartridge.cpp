@@ -3,7 +3,7 @@
 #include <iostream>
 #include <fstream>
 #include <string>
-// #include <mdspan>
+#include <chrono>
 
 class NoMBC : public Cartridge {
 private:
@@ -131,6 +131,140 @@ public:
 				std::uint16_t ramaddr = addr & 0x1FFF;
 				if ( banking_mode == advanced ) {
 					ramaddr |= bank_reg_high << 13;
+				}
+				RAM[ramaddr % RAM.capacity()] = data;
+			}
+		}
+		else {
+			SDL_Log("WARNING: Invalid cartridge memory write at: 0x%X (val=0x%X)\n", addr, data);
+		}
+	}
+};
+
+class MBC3 : public Cartridge {
+private:
+	bool RAM_and_TIM_enable;
+	std::uint8_t ROM_bank;
+	std::uint8_t RAM_bank;
+	std::uint8_t RTC_S;
+	std::uint8_t RTC_M;
+	std::uint8_t RTC_H;
+	std::uint8_t RTC_DL;
+	std::uint8_t RTC_DH;
+	// std::chrono::time_point<std::chrono::steady_clock> init_point;
+public:
+	MBC3 (
+		std::vector<std::uint8_t> ROMBANKS, 
+		std::vector<std::uint8_t> RAMBANKS,
+		std::uint8_t S = 0,
+		std::uint8_t M = 0,
+		std::uint8_t H = 0,
+		std::uint8_t DL = 0,
+		std::uint8_t DH = 0 ) : 
+		RTC_S(S), RTC_M(M), 
+		RTC_H(H), RTC_DL(DL), RTC_DH(DH) {
+		ROM = ROMBANKS;
+		RAM = RAMBANKS;
+		RAM_and_TIM_enable = false;
+		ROM_bank = 0x01;
+		RAM_bank = 0x00;
+		// init_point = std::chrono::steady_clock().now();
+	}
+	std::uint8_t read(std::uint16_t addr) override {
+		if ( addr >= 0x0000 && addr <= 0x3FFF ) {
+			std::uint32_t romaddr = addr & 0x3FFF;
+			return ROM[romaddr % ROM.capacity()];
+		}
+		else if ( addr >= 0x4000 && addr <= 0x7FFF ) {
+			std::uint32_t romaddr = (addr & 0x3FFF) | 
+									(ROM_bank << 14);
+			return ROM[romaddr % ROM.capacity()];
+		}
+		else if ( addr >= 0xA000 && addr <= 0xBFFF ) {
+			if ( !RAM_and_TIM_enable ) {
+				SDL_Log("WARNING: Attempt to read from disabled cartridge RAM or timer\n");
+				return 0xFF;
+			}
+			else {
+				std::uint16_t ramaddr = addr & 0x1FFF;
+				switch (RAM_bank)
+				{
+				case 0x08:
+					SDL_Log("WARNING: Reading RTC_S but not yet implemented\n");
+					return RTC_S;
+				case 0x09:
+					SDL_Log("WARNING: Reading RTC_M but not yet implemented\n");
+					return RTC_M;
+				case 0x0A:
+					SDL_Log("WARNING: Reading RTC_H but not yet implemented\n");
+					return RTC_H;
+				case 0x0B:
+					SDL_Log("WARNING: Reading RTC_DL but not yet implemented\n");
+					return RTC_DL;
+				case 0x0C:
+					SDL_Log("WARNING: Reading RTC_S but not yet implemented\n");
+					return RTC_DH;
+				default:
+					ramaddr |= RAM_bank << 13;
+					break;
+				}
+				return RAM[ramaddr % RAM.capacity()];
+			}
+
+		} 
+		else {
+			SDL_Log("WARNING: Invalid cartridge memory access at: 0x%X\n", addr);
+			return 0xFF;
+		}
+	}
+	void write(std::uint16_t addr, std::uint8_t data) override {
+		if ( addr >= 0x0000 && addr <= 0x1FFF ) {
+			if ( (data & 0x0F) == 0x0A ) {
+				RAM_and_TIM_enable = true;
+			}
+			else {
+				RAM_and_TIM_enable = false;
+			}
+		}
+		else if ( addr >= 0x2000 && addr <= 0x3FFF ) {
+			std::uint8_t val = data & 0x7F;
+			if ( val == 0 ) {
+				val = 0x01;
+			}
+			ROM_bank = val;
+		}
+		else if ( addr >= 0x4000 && addr <= 0x5FFF ) {
+			RAM_bank = data & 0xFF;
+		}
+		else if ( addr >= 0x6000 && addr <= 0x7FFF ) {
+			SDL_Log("WARNING: Attempt to latch cartridge clock data, but clock not implemented\n");
+		}
+		else if ( addr >= 0xA000 && addr <= 0xBFFF ) {
+			if ( !RAM_and_TIM_enable ) {
+				SDL_Log("WARNING: Attempt to write to disabled cartridge RAM or timer\n");
+			}
+			else {
+				std::uint16_t ramaddr = addr & 0x1FFF;
+				switch (RAM_bank)
+				{
+				case 0x08:
+					SDL_Log("WARNING: Writing RTC_S but not yet implemented\n");
+					break;
+				case 0x09:
+					SDL_Log("WARNING: Writing RTC_M but not yet implemented\n");
+					break;
+				case 0x0A:
+					SDL_Log("WARNING: Writing RTC_H but not yet implemented\n");
+					break;
+				case 0x0B:
+					SDL_Log("WARNING: Writing RTC_DL but not yet implemented\n");
+					break;
+				case 0x0C:
+					SDL_Log("WARNING: Writing RTC_S but not yet implemented\n");
+					break;
+				default:
+					ramaddr |= RAM_bank << 13;
+					break;
 				}
 				RAM[ramaddr % RAM.capacity()] = data;
 			}
@@ -286,6 +420,21 @@ std::unique_ptr<Cartridge> get_cartridge_from_romfile(const char* ROMFILE) {
 		f.close();
 		ramdata = std::vector<std::uint8_t>(ramsize);
 		cart = std::unique_ptr<Cartridge>(static_cast<Cartridge*>(new MBC1(romdata, ramdata)));
+		SDL_Log("Generated ROM size: %d\n", romdata.capacity());
+		SDL_Log("Generated RAM size: %d\n", ramdata.capacity());
+		return cart;
+	case 0x0F:
+	case 0x10:
+	case 0x11:
+	case 0x12:
+	case 0x13:
+		SDL_Log("MBC3: $%X\n", header[0x47]);
+		SDL_Log("WARNING: MBC3 supports timing functionality which is not yet implemented\n");
+		romdata = std::vector<std::uint8_t>(romsize);
+		f.read(reinterpret_cast<char*>(romdata.data()), romsize);
+		f.close();
+		ramdata = std::vector<std::uint8_t>(ramsize);
+		cart = std::unique_ptr<Cartridge>(static_cast<Cartridge*>(new MBC3(romdata, ramdata)));
 		SDL_Log("Generated ROM size: %d\n", romdata.capacity());
 		SDL_Log("Generated RAM size: %d\n", ramdata.capacity());
 		return cart;

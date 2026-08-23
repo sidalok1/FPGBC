@@ -131,7 +131,8 @@ static constexpr int GBC_H       = 144;   // GBC visible lines
 static constexpr int SCALE       = 4;     // Window scale factor
 static constexpr int WIN_W       = GBC_W * SCALE;
 static constexpr int WIN_H       = GBC_H * SCALE;
-constexpr double GB_FRAME_HZ = 4194304.0 / 70224.0;   // ≈ 59.7275 Hz — not exactly 60
+// constexpr double GB_FRAME_HZ = 4194304.0 / 70224.0;   // ≈ 59.7275 Hz — not exactly 60
+constexpr double GB_FRAME_HZ = 60.0;
 constexpr duration<double> FRAME_PERIOD(1.0 / GB_FRAME_HZ);
 
 static constexpr uint64_t GB_SEC = 4e6;

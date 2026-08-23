@@ -109,3 +109,4 @@ mts*
 gb-test-roms
 gameboy-doctor
 *.sav
+*.time
