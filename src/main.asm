@@ -3,6 +3,7 @@ INCLUDE "hardware.inc"
 SECTION "Header", ROM0[$100]
 
 Entry:
+	ld b, b
 	ld hl, Message
 	ld b, [hl]
 	inc hl

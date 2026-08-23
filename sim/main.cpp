@@ -35,6 +35,8 @@ using namespace std::chrono;
 #include <queue>
 #include <thread>
 
+#include "cartridge.hpp"
+
 // Python snippet using scipy.signal to design filters
 /* 
 from scipy import signal
@@ -65,12 +67,31 @@ public:
 #define SECTION2 Biquad( 1.0       ,-1.99999998, 1.0       ,-1.99998686, 0.99998688)
 #define SECTION3 Biquad( 1.0       , 0.0       , 0.0       , 0.0       , 0.0       )
 
-// #define GBDOC_FILE "gbdoc.log"
-// #define DEBUG
-// #define BREAKPOINT
+#define DEBUG
 // #define TIME
 // #define THREAD_AUDIO
+#define PRINT_SERIAL
+#define EMULATE_CARTRIDGE
 
+#ifdef DEBUG
+// #define GBDOC_FILE "gbdoc.log"
+// #define PRINT_CYCLE
+// #define DUMP_VRAM
+// #define BREAKPOINT
+// #define LOG_FRAMES
+#endif
+
+#ifdef PRINT_SERIAL
+#define PRINT_ASCII
+#endif
+
+#ifdef DUMP_VRAM
+static constexpr uint64_t DUMP_VRAM_CYCLE = 10e6;
+static bool bootram_unmapped = false;
+// #define DUMP_VRAM_COND cycle == DUMP_VRAM_CYCLE;
+#define DUMP_VRAM_COND (!bootram_unmapped) && ((bootram_unmapped = BANKL))
+
+#endif
 // -------------------------------------------------------------------------
 // Constants
 // -------------------------------------------------------------------------
@@ -129,7 +150,20 @@ int main(int argc, char** argv) {
 
     const std::unique_ptr<Vgbc> gbc{new Vgbc{ctx.get()}};
     // Vgbc* gbc = new Vgbc{ctx};
-    #ifdef GBDOC_FILE
+
+    #ifdef EMULATE_CARTRIDGE
+    if ( argc < 2 ) {
+        SDL_Log("ERROR: must pass in ROM file\n");
+        return 1;
+    }
+    std::unique_ptr<Cartridge> cart = get_cartridge_from_romfile(argv[1]);
+    if ( !cart ) {
+        SDL_Log("ERROR: Cartridge creation failed\n");
+        return 1;
+    }
+    #endif
+
+    #ifdef DEBUG
     #define REG_A gbc->rootp->System__DOT__Gameboy_SOC__DOT__cpu_core__DOT__regfile__DOT__r8_n[7]
     #define REG_B gbc->rootp->System__DOT__Gameboy_SOC__DOT__cpu_core__DOT__regfile__DOT__r8_n[0]
     #define REG_C gbc->rootp->System__DOT__Gameboy_SOC__DOT__cpu_core__DOT__regfile__DOT__r8_n[1]
@@ -150,16 +184,26 @@ int main(int argc, char** argv) {
     #define BANKL gbc->rootp->System__DOT__Gameboy_SOC__DOT__memory_access_controller__DOT__BANK_lock
     #define PHASE gbc->rootp->System__DOT__Gameboy_SOC__DOT__cpu_core__DOT__cpu_phase
     #define FETCH gbc->rootp->System__DOT__Gameboy_SOC__DOT__cpu_core__DOT__controller__DOT__fetch
+    #define PREFX gbc->rootp->System__DOT__Gameboy_SOC__DOT__cpu_core__DOT__controller__DOT__fetch_prefix
     #define INSTR gbc->rootp->System__DOT__Gameboy_SOC__DOT__cpu_core__DOT__controller__DOT__IR
-    std::ofstream gbdoc_fstream(GBDOC_FILE);
-    gbdoc_fstream << std::hex << std::setfill('0') << std::uppercase;
+    #define ITRSV gbc->rootp->System__DOT__Gameboy_SOC__DOT__cpu_core__DOT__controller__DOT__service_interrupt
+    #define VRAM0 gbc->rootp->System__DOT__Gameboy_SOC__DOT__pixel_processing_unit__DOT__vram_bank_0
+    #define VRAM1 gbc->rootp->System__DOT__Gameboy_SOC__DOT__pixel_processing_unit__DOT__vram_bank_1
+    #define OAMEM gbc->rootp->System__DOT__Gameboy_SOC__DOT__pixel_processing_unit__DOT__OAM
+    #ifdef GBDOC_FILE
+        std::ofstream gbdoc_fstream(GBDOC_FILE);
+        gbdoc_fstream << std::hex << std::setfill('0') << std::uppercase;
+    #endif
     #endif
     // --- SDL3 setup --------------------------------------------------------
-    if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO)) {
-        SDL_Log("SDL_Init failed: %s", SDL_GetError());
+    if (!SDL_Init(SDL_INIT_VIDEO)) {
+        SDL_Log("SDL_Init(SDL_INIT_VIDEO) failed: %s", SDL_GetError());
         return 1;
     }
-
+    if (!SDL_Init(SDL_INIT_AUDIO)) {
+        SDL_Log("SDL_Init(SDL_INIT_AUDIO) failed: %s", SDL_GetError());
+        return 1;
+    }
     SDL_Window* window = SDL_CreateWindow(
         "GBC PPU Simulation",
         // WIN_W, WIN_H,
@@ -171,7 +215,7 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    SDL_Renderer* renderer = SDL_CreateRenderer(window, nullptr);
+    SDL_Renderer* renderer = SDL_CreateRenderer(window, "software");
     if (!renderer) {
         SDL_Log("SDL_CreateRenderer failed: %s", SDL_GetError());
         return 1;
@@ -232,9 +276,16 @@ int main(int argc, char** argv) {
     uint8_t prev_hsync = 1;
     uint8_t prev_vsync = 1;
 
+    #ifdef PRINT_SERIAL
     uint8_t prev_sck = 0;
     int serial_counter = 0;
+    #ifdef PRINT_ASCII
     unsigned char sdata = 0;
+    #else
+    uint8_t sdata = 0;
+    std::cout << std::hex;
+    #endif
+    #endif
 
     // Current write position within the visible frame
     int cur_x = 0;
@@ -244,9 +295,22 @@ int main(int argc, char** argv) {
     bool in_vblank  = false;
     float seconds = 0;
 
+    bool    up = false,
+            down = false,
+            left = false,
+            right = false,
+            b = false,
+            a = false,
+            start = false,
+            select = false;
+
     // --- Reset sequence ----------------------------------------------------
     // Hold reset for 4 cycles then release
     // gbc->done = 0;
+    gbc->a_or_right = 1;
+    gbc->b_or_left = 1;
+    gbc->select_or_up = 1;
+    gbc->start_or_down = 1;
     gbc->eval();
     ctx->timeInc(clk_period_half);
     gbc->clk = 0;
@@ -262,7 +326,7 @@ int main(int argc, char** argv) {
     
     #ifdef TIME
     auto end = high_resolution_clock::now();
-    auto duration = duration_cast<microseconds>(end - start);
+    auto duration = duration_cast<nanoseconds>(end - start);
     std::cout   << "Initialization time: "
                 << duration.count()
                 << " us" << std::endl;
@@ -286,25 +350,38 @@ int main(int argc, char** argv) {
         }
         #endif
         gbc->clk = 0; gbc->eval();
+        #ifdef EMULATE_CARTRIDGE
+        if ( gbc->cart_we ) {
+            uint16_t addr = gbc->addr_line;
+            uint8_t data = gbc->soc_to_cart_data;
+            cart->write(addr, data);
+        }
+        if ( gbc->cart_re ) {
+            uint16_t addr = gbc->addr_line;
+            uint8_t data = cart->read(addr);
+            gbc->cart_to_soc_data = data;
+        }
+        #endif
         #ifdef GBDOC_FILE
-        if ( BANKL == 1 && PHASE == 0 && FETCH == 1 ){
+        if ( BANKL == 1 && PHASE == 0 && ((FETCH == 1 && ITRSV == 0) || PREFX == 1) ){
             uint16_t SP = (RSP_H << 8) | RSP_L;
             // uint16_t PC = (RPC_H << 8) | RPC_L;
             uint16_t addr;
             uint16_t PCMEM0, PCMEM1, PCMEM2, PCMEM3;
             if ( ADDRB >= 0xD000 && ADDRB < 0xE000 ) {
                 addr = ADDRB - 0xD000;
-                if ( WBANK == 0 ) {
+                uint8_t bank = WBANK & 0x07;
+                if ( bank == 0 ) {
                     PCMEM0 = WRAMS[1][addr];
                     PCMEM1 = WRAMS[1][addr+1];
                     PCMEM2 = WRAMS[1][addr+2];
                     PCMEM3 = WRAMS[1][addr+3];
                 }
                 else {
-                    PCMEM0 = WRAMS[WBANK][addr];
-                    PCMEM1 = WRAMS[WBANK][addr+1];
-                    PCMEM2 = WRAMS[WBANK][addr+2];
-                    PCMEM3 = WRAMS[WBANK][addr+3];
+                    PCMEM0 = WRAMS[bank][addr];
+                    PCMEM1 = WRAMS[bank][addr+1];
+                    PCMEM2 = WRAMS[bank][addr+2];
+                    PCMEM3 = WRAMS[bank][addr+3];
                 }
                 
             }
@@ -359,7 +436,7 @@ int main(int argc, char** argv) {
         #ifdef TIME
         if ( cycle % CYCLE_INTERVAL == 0 ){
             end = high_resolution_clock::now();
-            duration = duration_cast<microseconds>(end - start);
+            duration = duration_cast<nanoseconds>(end - start);
             std::cout   << "Cycle " << cycle << " time: "
                         << duration.count()
                         << " us" << std::endl;            
@@ -367,6 +444,55 @@ int main(int argc, char** argv) {
         }
         #endif
         ctx->timeInc(clk_period_half); seconds += 1/4e6;
+
+        #ifdef DUMP_VRAM
+        if ( DUMP_VRAM_COND ) {
+            std::ofstream vram0_dump("bank0-main");
+            std::ofstream vram1_dump("bank1-main");
+            std::ofstream oam_dump("oam-main");
+            vram0_dump << std::hex << std::setfill('0') << std::uppercase;
+            vram1_dump << std::hex << std::setfill('0') << std::uppercase;
+            oam_dump << std::hex << std::setfill('0') << std::uppercase;
+            for ( int i = 0; i < 8192; i += 16 ) {
+                if ( i < 160 ) {
+                    oam_dump << std::setw(4) << i + 0xFE00 << " | ";
+                    for ( int j = 0; j < 16; j++ ) {
+                        oam_dump << std::setw(2) << (int)OAMEM[i+j];
+                        if ( j == 7 ) {
+                            oam_dump << "  ";
+                        }
+                        else if ( j == 15 ) {
+                            oam_dump << std::endl;
+                        }
+                        else {
+                            oam_dump << " ";
+                        }
+                    }
+                }
+                vram0_dump << std::setw(4) << i + 0x8000 << " | ";
+                vram1_dump << std::setw(4) << i + 0x8000 << " | ";
+                for ( int j = 0; j < 16; j++ ) {
+                    vram0_dump << std::setw(2) << (int)VRAM0[i+j];
+                    vram1_dump << std::setw(2) << (int)VRAM1[i+j];
+                    if ( j == 7 ) {
+                        vram0_dump << "  ";
+                        vram1_dump << "  ";
+                    }
+                    else if ( j == 15 ) {
+                        vram0_dump << std::endl;
+                        vram1_dump << std::endl;
+                    }
+                    else {
+                        vram0_dump << " ";
+                        vram1_dump << " ";
+                    }
+                }
+            }
+            vram0_dump.close();
+            vram1_dump.close();
+            oam_dump.close();
+        }
+        #endif
 
         // --- Decode outputs on the rising edge -------------------------
         #ifdef THREAD_AUDIO
@@ -394,15 +520,18 @@ int main(int argc, char** argv) {
         bool vsync_rising  = (prev_vsync == 0) && (gbc->vsync == 1);
 
         if (vsync_falling) {
-            #ifdef DEBUG
-            char buf[32];
-            if ( snprintf(buf, 32, "./_out/frame/frame%d.ppm", frame++) > 0 ) {
-                FILE* f = fopen(buf, "wb");
+            #ifdef PRINT_CYCLE
+            std::cout << cycle << std::endl;
+            #endif
+            #ifdef LOG_FRAMES
+            char filebuf[64];
+            if ( snprintf(filebuf, sizeof(filebuf), "./_out/frame/%d.ppm", (int)cycle) > 0 ) {
+                FILE* f = fopen(filebuf, "wb");
                 fprintf(f, "P6\n%d %d\n255\n", GBC_W, GBC_H);
                 for (int i = 0; i < GBC_W * GBC_H; i++) {
                     uint32_t px = framebuf[i];
-                    uint8_t r = (px >> 16) & 0xFF, g = (px >> 8) & 0xFF, b = px & 0xFF;
-                    fwrite(&r, 1, 1, f); fwrite(&g, 1, 1, f); fwrite(&b, 1, 1, f);
+                    uint8_t rpx = (px >> 16) & 0xFF, gpx = (px >> 8) & 0xFF, bpx = px & 0xFF;
+                    fwrite(&rpx, 1, 1, f); fwrite(&gpx, 1, 1, f); fwrite(&bpx, 1, 1, f);
                 }
                 fclose(f);
             }
@@ -437,31 +566,6 @@ int main(int argc, char** argv) {
             // Reset pixel write position for the new frame
             cur_x = 0;
             cur_y = 0;
-            #ifdef DEBUG
-            SDL_Log("End of frame");
-            SDL_Event e;
-            bool wait = true;
-            while (wait) {
-                if (SDL_WaitEvent(&e)) {
-                    if (e.type == SDL_EVENT_QUIT) {
-                        done = true;
-                        running = false;
-                        wait = false;
-                    };
-                    if (e.type == SDL_EVENT_KEY_DOWN) {
-                        switch (e.key.key)
-                        {
-                        case SDLK_SPACE:
-                            wait = false;
-                            break;
-                        default:
-                            // continue
-                            break;
-                        }
-                    }
-                }
-            }
-            #endif
         }
 
         if (vsync_rising) {
@@ -498,6 +602,7 @@ int main(int argc, char** argv) {
         prev_hsync = gbc->hsync;
         prev_vsync = gbc->vsync;
 
+        #ifdef PRINT_SERIAL
         bool sck_rising = (prev_sck == 0) && (gbc->sck_o == 1);
         if ( sck_rising ) {
             sdata = (sdata << 1) + gbc->sdo;
@@ -507,10 +612,15 @@ int main(int argc, char** argv) {
         prev_sck = gbc->sck_o;
 
         if ( serial_counter == 8 ) {
+            #ifndef PRINT_ASCII
+            std::cout << std::setw(2) << (int)sdata << " " << std::flush;
+            #else
             std::cout << sdata << std::flush;
+            #endif
             sdata = 0;
             serial_counter = 0;
         }
+        #endif
 
         // --- SDL event handling (check every ~456 cycles = one scanline) ---
         if (cycle % 456 == 0) {
@@ -520,11 +630,74 @@ int main(int argc, char** argv) {
                     running = false;
                     done = true;
                 }
-                if (e.type == SDL_EVENT_KEY_DOWN &&
-                    e.key.key == SDLK_ESCAPE)
-                    running = false;
+                // if (e.type == SDL_EVENT_KEY_DOWN &&
+                //     e.key.key == SDLK_ESCAPE)
+                //     running = false;
+                bool pressed = e.type == SDL_EVENT_KEY_DOWN;
+                if ( e.type == SDL_EVENT_KEY_DOWN || e.type == SDL_EVENT_KEY_UP ) {
+                    switch (e.key.key)
+                    {
+                    case SDLK_ESCAPE:
+                        running = false;
+                        break;
+                    case SDLK_UP:
+                        up = pressed;
+                        break;
+                    case SDLK_DOWN:
+                        down = pressed;
+                        break;
+                    case SDLK_LEFT:
+                        left = pressed;
+                        break;
+                    case SDLK_RIGHT:
+                        right = pressed;
+                        break;
+                    case SDLK_LSHIFT:
+                        select = pressed;
+                        break;
+                    case SDLK_RSHIFT:
+                        start = pressed;
+                        break;
+                    case SDLK_Z:
+                        b = pressed;
+                        break;
+                    case SDLK_X:
+                        a = pressed;
+                        break;
+                    default:
+                        break;
+                    }
+                }
             }
+            
+
+            // gbc->a_or_right     = (~a | ~btns) & (~right | ~dpad);
+            // gbc->b_or_left      = (~b | ~btns) & (~left  | ~dpad);
+            // gbc->select_or_up   = (~select | ~btns) & (~up   | ~dpad);
+            // gbc->start_or_down  = (~start  | ~btns) & (~down | ~dpad);
         }
+        bool btns = gbc->select_buttons;
+        bool dpad = gbc->select_dpad;
+
+        gbc->a_or_right = 1;
+        gbc->b_or_left = 1;
+        gbc->select_or_up = 1;
+        gbc->start_or_down = 1;
+
+        if ( !btns ) {
+            gbc->a_or_right &= ~a;
+            gbc->b_or_left &= ~b;
+            gbc->select_or_up &= ~select;
+            gbc->start_or_down &= ~start;
+        }
+
+        if ( !dpad ) {
+            gbc->a_or_right &= ~right;
+            gbc->b_or_left &= ~left;
+            gbc->select_or_up &= ~up;
+            gbc->start_or_down &= ~down;
+        }
+
         #ifdef BREAKPOINT
         if ( gbc->dbg_break ) {
             SDL_Log("Breakpoint hit");
@@ -558,7 +731,7 @@ int main(int argc, char** argv) {
         #ifdef TIME
         if ( cycle % CYCLE_INTERVAL == 0 ){
             end = high_resolution_clock::now();
-            duration = duration_cast<microseconds>(end - start);
+            duration = duration_cast<nanoseconds>(end - start);
             std::cout   << "Decode " << cycle << " time: "
                         << duration.count()
                         << " us" << std::endl;
@@ -568,10 +741,7 @@ int main(int argc, char** argv) {
     }
     std::cout << std::endl;
 
-    #ifdef GBDOC_FILE
-    // fclose(gbdoc_f);
-    gbdoc_fstream.close();
-    #endif
+    
 
     if (!done) {
         if (ctx->gotFinish()) {
@@ -594,6 +764,11 @@ int main(int argc, char** argv) {
     // gbc->eval();
     // gbc->done = 1;
     // gbc->eval();
+
+    #ifdef GBDOC_FILE
+    // fclose(gbdoc_f);
+    gbdoc_fstream.close();
+    #endif
 
     gbc->final();
 

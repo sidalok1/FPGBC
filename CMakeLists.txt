@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.20)
 cmake_policy(SET CMP0144 NEW)
 project(gbc_sim CXX)
 
-# set(CMAKE_CXX_STANDARD 20)
+# set(CMAKE_CXX_STANDARD 26)
 
 
 # ---------------------------------------------------------------------------
@@ -31,28 +31,8 @@ endif()
 # ---------------------------------------------------------------------------
 # Verilate the RTL and create a simulation executable
 # ---------------------------------------------------------------------------
-add_executable(gbc_sim sim/main.cpp)
-
-# set(HDL_SOURCES
-#     src/System.v
-#     src/MBC.v
-#     src/SoC.v
-#     src/ClockDivider.v
-#     src/PPU.v
-#     src/MAC.v
-#     src/Core.v
-#     src/ControlUnit.v
-#     src/ALU.v
-#     src/RegisterFile.v
-#     src/IDU.v
-#     src/CondCheck.v
-#     src/PriorityEncoder.v
-#     src/PriorityEncoder5.v
-#     src/PriorityEncoder10.v
-#     src/Serial.v
-#     src/Timer.v
-#     src/APU.v
-# )
+add_executable(gbc_sim sim/main.cpp sim/cartridge.cpp)
+include_directories(include)
 
 set(HDL_SOURCES
     src/System.v

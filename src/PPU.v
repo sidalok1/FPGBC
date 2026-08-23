@@ -15,7 +15,8 @@ module PPU (
     output reg [4:0] r, g, b,
     output reg de,
     output reg stat_intr,
-    output reg vblank_intr
+    output reg vblank_intr,
+    output wire [1:0] LCD_mode
 );
 
     `include "RegMap.vh"
@@ -25,17 +26,17 @@ module PPU (
     
     //  | LCD_EN    |  WIN_MAP  |  WIN_EN   |  TILE_SEL |   BG_MAP  | OBJ_SIZE  |  OBJ_EN   |   BG_EN   |
     //  |                                              R/W                                              |  
-    reg [7:0] LCDC_reg = 8'h91;
+    reg [7:0] LCDC_reg = 8'h00;
     reg [7:0] LCDC_reg_n;
     wire LCD_EN, WIN_MAP, WIN_EN, TILE_SEL, BG_MAP, OBJ_SIZE, OBJ_EN, BG_EN;
     assign {LCD_EN, WIN_MAP, WIN_EN, TILE_SEL, BG_MAP, OBJ_SIZE, OBJ_EN, BG_EN} = LCDC_reg;
 
     //  |     -     | INTR_LYC  |  INTR_M2  |  INTR_M1  |  INTR_M0  | LYC_STAT  |       LCD_MODE        |
     //  |     U     |                      R/W                      |                 R                 |
-    reg [7:0] STAT_reg = 8'b0;
+    reg [7:0] STAT_reg = 8'h82;
     reg [7:0] STAT_reg_n;
-    wire INTR_LYC_EN, INTR_M2_EN, INTR_M1_EN, INTR_M0_EN;
-    assign {INTR_LYC_EN, INTR_M2_EN, INTR_M1_EN, INTR_M0_EN} = STAT_reg[6:3];
+    wire INTR_LYC_EN, INTR_M2_EN, INTR_M1_EN, INTR_M0_EN, LY_EQ_LYC;
+    assign {INTR_LYC_EN, INTR_M2_EN, INTR_M1_EN, INTR_M0_EN, LY_EQ_LYC, LCD_mode} = STAT_reg[6:0];
     //  |                                              SCY                                              |
     //  |                                              R/W                                              |
     reg [7:0] SCY_reg = 8'b0;
@@ -90,7 +91,7 @@ module PPU (
     //  |     ?     |     ?     |     ?     |     ?     |     ?     | DMG_MODE  |     ?     |     ?     |
     //  |                                                R                                              |
     // writes lock after first write to BANK
-    reg [7:0] KEY0_reg = 8'h0;
+    reg [7:0] KEY0_reg = 8'h00;
     reg [7:0] KEY0_reg_n;
     reg KEY0_locked = 0;
     reg KEY0_locked_n;
@@ -103,7 +104,7 @@ module PPU (
 
     //  | AUTO_INC  |     -     |                              BGP_ADDR                                 |
     //  |                                              R/W                                              |
-    reg [7:0] BGPI_reg = 8'b0;
+    reg [7:0] BGPI_reg = 8'hC0;
     reg [7:0] BGPI_reg_n;
     wire BGP_AUTO_INC = BGPI_reg[7];
     wire [5:0] BGP_ADDR = BGPI_reg[5:0];
@@ -114,7 +115,7 @@ module PPU (
 
     //  | AUTO_INC  |     -     |                              OBP_ADDR                                 |
     //  |                                              R/W                                              |
-    reg [7:0] OBPI_reg = 8'b0;
+    reg [7:0] OBPI_reg = 8'hC0;
     reg [7:0] OBPI_reg_n;
     wire OBP_AUTO_INC = OBPI_reg[7];
     wire [5:0] OBP_ADDR = OBPI_reg[5:0];
@@ -126,7 +127,7 @@ module PPU (
     //  |                                              R/W                                              |
     // Online documentation seems to suggest that this register locks after unmapping the boot rom. I am
     // for now keeping it unlocked.
-    reg [7:0] OPRI_reg = 8'h0;
+    reg [7:0] OPRI_reg = 8'hFE;
     reg [7:0] OPRI_reg_n;
     wire OBJ_PRI_MODE = OPRI_reg[0];
 
@@ -135,7 +136,7 @@ module PPU (
     reg [12:0] vram_addr;
     reg [7:0] vram_din;
     wire [7:0] vram0_dout = vram_bank_0[vram_addr];
-    wire [7:0] vram1_dout = vram_bank_1[vram_addr];
+    wire [7:0] vram1_dout = DMG_mode ? 8'h00 : vram_bank_1[vram_addr];
     reg addr_in_is_vram;
     reg [7:0] OAM [0:159];
     reg oam_we;
@@ -336,22 +337,22 @@ module PPU (
                         if ( obj_attr[5] == 1 )
                             if ( !DMG_mode ) begin
                                 obj_fifo[n] <= obj_fifo_merge[n] ?
-                                    {obj_addr[7:2], obj_high[n], obj_low[n], obj_attr[2:0], obj_attr[7]} :
+                                    {obj_addr[5:0], obj_high[n], obj_low[n], obj_attr[2:0], obj_attr[7]} :
                                     obj_fifo[n];
                             end
                             else begin
                                 obj_fifo[n] <= obj_fifo_merge[n] ?
-                                    {obj_addr[7:2], obj_high[n], obj_low[n], 2'b0, obj_attr[4], obj_attr[7]} :
+                                    {obj_addr[5:0], obj_high[n], obj_low[n], 2'b0, obj_attr[4], obj_attr[7]} :
                                     obj_fifo[n];
                             end
                         else
                             if ( !DMG_mode )
                                 obj_fifo[n] <= obj_fifo_merge[n] ?
-                                    {obj_addr[7:2], obj_high[7-n], obj_low[7-n], obj_attr[2:0], obj_attr[7]} :
+                                    {obj_addr[5:0], obj_high[7-n], obj_low[7-n], obj_attr[2:0], obj_attr[7]} :
                                     obj_fifo[n];
                             else
                                 obj_fifo[n] <= obj_fifo_merge[n] ?
-                                    {obj_addr[7:2], obj_high[7-n], obj_low[7-n], 2'b0, obj_attr[4], obj_attr[7]} :
+                                    {obj_addr[5:0], obj_high[7-n], obj_low[7-n], 2'b0, obj_attr[4], obj_attr[7]} :
                                     obj_fifo[n];
                     end
                     else if ( obj_fifo_read ) begin
@@ -418,7 +419,7 @@ module PPU (
             DMA_state <= 0;
             start_DMA <= 0;
             DMA_counter <= 0;
-            current_mode <= oamScan;
+            current_mode <= h_blank;
             dot_counter <= 0;
             oamScan_substate <= get_y_position;
             oam_idx <= 0;
@@ -462,8 +463,8 @@ module PPU (
             hsync <= 1;
             vsync <= 1;
             LY_reg <= 0;
-            LCDC_reg <= 8'h91;
-            STAT_reg[7:3] <= 0;
+            LCDC_reg <= 8'h00;
+            STAT_reg[7:3] <= 5'b10000;
             SCY_reg <= 0;
             SCX_reg <= 0;
             LYC_reg <= 0;
@@ -475,9 +476,10 @@ module PPU (
             WY_reg <= 0;
             KEY0_reg <= 0;
             KEY0_locked <= 0;
-            BGPI_reg <= 0;
-            OBPI_reg <= 0;
-            OPRI_reg <= 0;
+            BGPI_reg <= 8'hC0;
+            OBPI_reg <= 8'hC0;
+            OPRI_reg <= 8'hFE;
+            VBK_reg <= 8'hFE;
         end
         else
         if ( en ) begin
@@ -608,7 +610,7 @@ module PPU (
     always @* begin
         // defaults (if needed)
         LCDC_reg_n                      = LCDC_reg;
-        STAT_reg_n                      = STAT_reg;
+        STAT_reg_n[7:3]                 = STAT_reg[7:3];
         SCY_reg_n                       = SCY_reg;
         SCX_reg_n                       = SCX_reg;
         LY_reg_n                        = LY_reg;
@@ -648,8 +650,16 @@ module PPU (
         next_mode                       = current_mode;
         oamScan_substate_n              = oamScan_substate;
         oam_idx_n                       = oam_idx;
-        oam_addr                        = addr_in[7:0];
-        vram_addr                       = addr_in[12:0];
+        if ( addr_in_is_oam )
+            oam_addr                    = addr_in[7:0];
+        else
+            oam_addr                    = 8'b0;
+        if ( addr_in_is_vram )
+            vram_addr                   = addr_in[12:0];
+        else
+            vram_addr                   = 13'b0;
+        // oam_addr                        = addr_in[7:0];
+        // vram_addr                       = addr_in[12:0];
         obj_is_on_line                  = 0;
         objs_on_scanline_n              = objs_on_scanline;
         write_obj_arr                   = 0;
@@ -722,7 +732,7 @@ module PPU (
         if ( wen ) begin
             case ( addr_in )
                 LCDC: LCDC_reg_n =      data_in;
-                STAT: STAT_reg_n[7:3] = data_in[7:3];
+                STAT: STAT_reg_n[6:3] = data_in[6:3];
                 SCY:  SCY_reg_n =       data_in;
                 SCX:  SCX_reg_n =       data_in;
                 // LY is R/O
@@ -731,7 +741,7 @@ module PPU (
                     // DMA register always written to but should only be triggered with valid
                     // address
                     DMA_reg_n =     data_in;
-                    if ( data_in < 8'hDF ) begin
+                    if ( data_in <= 8'hDF ) begin
                         start_DMA_n =   1;
                     end
                     else begin
@@ -766,13 +776,23 @@ module PPU (
                 OPRI: OPRI_reg_n =      data_in;
                 default:; //
             endcase
-            if ( addr_in_is_oam )
+            if ( addr_in_is_oam ) begin
                 oam_we = 1;
-            if ( addr_in_is_vram )
-                if ( VBK_reg[0] == 0 )
+                // oam_addr = addr_in[7:0];
+            end
+            if ( addr_in_is_vram ) begin
+                // vram_addr = addr_in[12:0];
+                if ( DMG_mode )
                     vram0_we = 1;
-                else if ( !DMG_mode )
+                else if ( VBK_reg[0] == 0 )
+                    vram0_we = 1;
+                else
                     vram1_we = 1;
+            end
+                // if ( VBK_reg[0] == 0 )
+                //     vram0_we = 1;
+                // else if ( !DMG_mode )
+                //     vram1_we = 1;
         end
 
         
@@ -1221,7 +1241,7 @@ module PPU (
                 OPRI:   data_out = OPRI_reg;
                 default: begin
                     if ( addr_in >= 16'h8000 && addr_in <= 16'h9FFF ) // VRAM address range 
-                        if ( VBK_reg[0] == 1'b0 )
+                        if ( VBK_reg[0] == 1'b0 || DMG_mode )
                             data_out = (current_mode != drawing && DMA_state != 1) ? vram0_dout : 8'hFF;
                         else // if ( VBK_reg[0] == 1'b1 )
                             data_out = (current_mode != drawing && DMA_state != 1) ? vram1_dout : 8'hFF;

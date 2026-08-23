@@ -13,9 +13,13 @@ module Chan1 (
 
     `include "RegMap.vh"
 
+    `ifdef DEBUG
+    reg dbg_we_regs;
+    `endif
+
     //  |     -     |                PACE               | DIRECTION |           INDIVIDUAL_STEP         |
     //  |                                              R/W                                              | 
-    wire [7:0] NR10_rd_mask = 8'hFF;
+    localparam [7:0] NR10_rd_mask = 8'h7F;
     reg [7:0] NR10_reg = 8'b0;  
 	reg [7:0] NR10_reg_n;
     wire [2:0] PACE = NR10_reg[6:4];
@@ -24,7 +28,7 @@ module Chan1 (
 
     //  |       WAVE_DUTY       |                         INITIAL_LENGTH_TIMER                          |
     //  |          R/W          |                                   W/O                                 |
-    wire [7:0] NR11_rd_mask = 8'b11_000000;
+    localparam [7:0] NR11_rd_mask = 8'b11_000000;
     reg [7:0] NR11_reg = 8'b0;
     reg [7:0] NR11_reg_n;
     wire [1:0] WAVE_DUTY = NR11_reg[7:6];
@@ -32,7 +36,7 @@ module Chan1 (
 
     //  |                INITIAL_VOLUME                 |  ENV_DIR  |             SWEEP_PACE            |
     //  |                     R/W                       |    R/W    |                R/W                |  
-    wire [7:0] NR12_rd_mask = 8'hFF;
+    localparam [7:0] NR12_rd_mask = 8'hFF;
     reg [7:0] NR12_reg = 8'b0;
     reg [7:0] NR12_reg_n;
     wire [3:0] INITIAL_VOLUME = NR12_reg[7:4];
@@ -44,14 +48,14 @@ module Chan1 (
 
     //  |                                          PERIOD_LOW                                           |
     //  |                                              W/O                                              |
-    wire [7:0] NR13_rd_mask = 8'h00;
+    localparam [7:0] NR13_rd_mask = 8'h00;
     reg [7:0] NR13_reg = 8'b0;  
 	reg [7:0] NR13_reg_n;
     wire [7:0] PERIOD_LOW = NR13_reg;
 
     //  |  TRIGGER  | LENGTH_EN |                 -                 |            PERIOD_HIGH            |
     //  |    W/O    |    R/W    |                                   |                W/O                |
-    wire [7:0] NR14_rd_mask = 8'b0_1_111_000;
+    localparam [7:0] NR14_rd_mask = 8'b0_1_000000;
     reg [7:0] NR14_reg = 8'b0;  
 	reg [7:0] NR14_reg_n;
     wire TRIGGER = we == 1 && addr == NR14 && din[7]; // trigger the cycle NR14 is written to
@@ -96,6 +100,9 @@ module Chan1 (
     assign waveforms[2'b11] = 8'b10000001;
 
     always @* begin
+        `ifdef DEBUG
+        dbg_we_regs = 0;
+        `endif
         dout = 8'b0;
         dac_data = 4'b0;
         NR10_reg_n = NR10_reg;
@@ -116,11 +123,11 @@ module Chan1 (
 
         if ( re ) begin
             case ( addr ) 
-                NR10: dout = NR10_reg & NR10_rd_mask;
-                NR11: dout = NR11_reg & NR11_rd_mask;
-                NR12: dout = NR12_reg & NR12_rd_mask;
-                NR13: dout = NR13_reg & NR13_rd_mask;
-                NR14: dout = NR14_reg & NR14_rd_mask;
+                NR10: dout = NR10_reg | ~NR10_rd_mask;
+                NR11: dout = NR11_reg | ~NR11_rd_mask;
+                NR12: dout = NR12_reg | ~NR12_rd_mask;
+                NR13: dout = NR13_reg | ~NR13_rd_mask;
+                NR14: dout = NR14_reg | ~NR14_rd_mask;
                 default:;// 
             endcase
         end
@@ -133,13 +140,20 @@ module Chan1 (
         end 
         else begin
             if ( we ) begin
+            `ifdef DEBUG
+            dbg_we_regs = 1;
+            `endif
                 case ( addr )
                     NR10: NR10_reg_n = din;
                     NR11: NR11_reg_n = din;
                     NR12: NR12_reg_n = din;
                     NR13: NR13_reg_n = din;
                     NR14: NR14_reg_n = din;
-                    default:;// 
+                    `ifdef DEBUG
+                    default: dbg_we_regs = 0;
+                    `else
+                    default:;//
+                    `endif
                 endcase
             end
 
@@ -214,7 +228,10 @@ module Chan1 (
                         end
                     end
                     if ( LENGTH_EN ) begin
-                        if ( length_timer == 7'h7F )
+                        if ( we == 1'b1 && addr == NR11 ) begin
+                            length_timer_n = {din[5:0], 1'b0};
+                        end
+                        else if ( length_timer == 7'h7F )
                             NR14_reg_n[7] = DISABLED;
                         else
                             length_timer_n = length_timer + 1;

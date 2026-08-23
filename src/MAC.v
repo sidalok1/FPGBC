@@ -25,7 +25,7 @@ module MAC(
 
     //  |                                             SVBK                                              |
     //  |                                              R/W                                              |
-    reg [7:0] SVBK_reg = 8'h00;
+    reg [7:0] SVBK_reg = 8'hF8;
     /*verilator tracing_off*/
     reg [7:0] bootrom [0:2047 + 'h100];
     /*verilator tracing_on*/
@@ -48,7 +48,7 @@ module MAC(
     reg ppu_addr_in_echo, cpu_addr_in_echo, ppu_addr_echo_banked, cpu_addr_echo_banked;
 
     initial begin
-        $readmemh("roms/testboot.mem", bootrom);
+        $readmemh("roms/cgb_boot.mem", bootrom);
     end
 
 
@@ -56,7 +56,7 @@ module MAC(
         if ( rst ) begin
             BANK_reg <= 0;
             BANK_lock <= 0;
-            SVBK_reg <= 0;
+            SVBK_reg <= 8'hF8;
         end
         else if ( en ) begin
             if ( wram_we )

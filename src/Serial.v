@@ -18,12 +18,14 @@ module Serial (
 
 	//  |                                               SB                                              |
     //  |                                              R/W                                              |
-    reg [7:0] SB_reg = 8'b0;  
+    reg [7:0] SB_reg = 8'b0;
+	localparam [7:0] SB_mask = 8'h00;
 	reg [7:0] SB_reg_n;
 
 	//  |                                               SC                                              |
     //  |                                              R/W                                              |
     reg [7:0] SC_reg = 8'b0;  
+	localparam [7:0] SC_mask = 8'h7C;
 	reg [7:0] SC_reg_n;
 	wire TRANSFER_EN = SC_reg[7];
 	wire CLOCK_SPEED = SC_reg[1];
@@ -75,7 +77,8 @@ module Serial (
 		count_n = count;
 
 		
-		sck_o = CLOCK_SPEED ? high_speed_clock : low_speed_clock;
+		sck_o = CLCK_SELECT == 0 ? 0 :
+			CLOCK_SPEED ? high_speed_clock : low_speed_clock;
 		negedge_detected = CLCK_SELECT ? 
 			(~sck_o & sck_reg) :
 			(~sck_i & sck_reg);
@@ -118,8 +121,8 @@ module Serial (
 
 		if ( re ) begin
 			case ( addr )
-				SB: dout = SB_reg;
-				SC: dout = SC_reg;
+				SB: dout = SB_reg | SB_mask;
+				SC: dout = SC_reg | SC_mask;
 				default:;//
 			endcase
 		end

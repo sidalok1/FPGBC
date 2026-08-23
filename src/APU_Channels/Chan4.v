@@ -12,16 +12,20 @@ module Chan4 (
 
     `include "RegMap.vh"
 
+    `ifdef DEBUG
+    reg dbg_we_regs;
+    `endif
+
     //  |           -           |                         INITIAL_LENGTH_TIMER                          |
     //  |                       |                                   W/O                                 |
-    wire [7:0] NR41_rd_mask = 8'b11_000000;
+    localparam [7:0] NR41_rd_mask = 8'h00;
     reg [7:0] NR41_reg = 8'b0;
     reg [7:0] NR41_reg_n;
     wire [5:0] INITIAL_LENGTH_TIMER = NR41_reg[5:0];
 
     //  |                INITIAL_VOLUME                 |  ENV_DIR  |             SWEEP_PACE            |
     //  |                     R/W                       |    R/W    |                R/W                |  
-    wire [7:0] NR42_rd_mask = 8'hFF;
+    localparam [7:0] NR42_rd_mask = 8'hFF;
     reg [7:0] NR42_reg = 8'b0;
     reg [7:0] NR42_reg_n;
     wire [3:0] INITIAL_VOLUME = NR42_reg[7:4];
@@ -32,7 +36,7 @@ module Chan4 (
 
     //  |                 CLOCK_SHIFT                   |   WIDTH   |           CLOCK_DIVIDER           |
     //  |                     R/W                       |    R/W    |                R/W                | 
-    wire [7:0] NR43_rd_mask = 8'hFF;
+    localparam [7:0] NR43_rd_mask = 8'hFF;
     reg [7:0] NR43_reg = 8'b0;  
 	reg [7:0] NR43_reg_n;
     wire [3:0] CLOCK_SHIFT = NR43_reg[7:4];
@@ -42,7 +46,7 @@ module Chan4 (
 
     //  |  TRIGGER  | LENGTH_EN |                                   -                                   |
     //  |    W/O    |    R/W    |                                                                       |
-    wire [7:0] NR44_rd_mask = 8'b0_1_111111;
+    localparam [7:0] NR44_rd_mask = 8'b0_1_000000;
     reg [7:0] NR44_reg = 8'b0;  
 	reg [7:0] NR44_reg_n;
     wire TRIGGER = we == 1 && addr == NR44 && din[7]; // trigger the cycle NR14 is written to
@@ -88,6 +92,9 @@ module Chan4 (
 
 
     always @* begin
+        `ifdef DEBUG
+        dbg_we_regs = 0;
+        `endif
         dout = 8'b0;
         dac_data = 4'b0;
         NR41_reg_n = NR41_reg;
@@ -112,10 +119,10 @@ module Chan4 (
 
         if ( re ) begin
             case ( addr ) 
-                NR41: dout = NR41_reg & NR41_rd_mask;
-                NR42: dout = NR42_reg & NR42_rd_mask;
-                NR43: dout = NR43_reg & NR43_rd_mask;
-                NR44: dout = NR44_reg & NR44_rd_mask;
+                NR41: dout = NR41_reg | ~NR41_rd_mask;
+                NR42: dout = NR42_reg | ~NR42_rd_mask;
+                NR43: dout = NR43_reg | ~NR43_rd_mask;
+                NR44: dout = NR44_reg | ~NR44_rd_mask;
                 default:;// 
             endcase
         end
@@ -127,12 +134,19 @@ module Chan4 (
         end
         else begin
             if ( we ) begin
+            `ifdef DEBUG
+            dbg_we_regs = 1;
+            `endif
                 case ( addr )
                     NR41: NR41_reg_n = din;
                     NR42: NR42_reg_n = din;
                     NR43: NR43_reg_n = din;
                     NR44: NR44_reg_n = din;
+                    `ifdef DEBUG
+                    default: dbg_we_regs = 0;
+                    `else
                     default:;//
+                    `endif
                 endcase
             end
 
@@ -176,7 +190,10 @@ module Chan4 (
                         end
                     end
                     if ( LENGTH_EN ) begin
-                        if ( length_timer == 7'h7F )
+                        if ( we == 1'b1 && addr == NR41 ) begin
+                            length_timer_n = {din[5:0], 1'b0};
+                        end
+                        else if ( length_timer == 7'h7F )
                             NR44_reg_n[7] = DISABLED;
                         else
                             length_timer_n = length_timer + 1;

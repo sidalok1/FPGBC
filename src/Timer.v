@@ -79,8 +79,8 @@ module Timer (
         TMA_reg_n = TMA_reg;
         TAC_reg_n = TAC_reg;
         tima_tick_reg_n = TIMA_reg[7];
-        apu_stick_reg_n = SYS_COUNT_reg[11];
-        apu_dtick_reg_n = SYS_COUNT_reg[10];
+        apu_stick_reg_n = DIV_reg[4];
+        apu_dtick_reg_n = DIV_reg[5];
         div_apu_event = dbl_spd ? apu_dnegedge & en : apu_snegedge & en;
 
         case ( CLOCK_SELECT )

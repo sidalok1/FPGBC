@@ -11,8 +11,13 @@ module APU (
 
     `include "RegMap.vh"
 
+    `ifdef DEBUG
+    reg dbg_we_regs;
+    `endif
+
     //  |  VIN_LEFT |            LEFT_VOLUME            | VIN_RIGHT |           RIGHT_VOLUME            |
     //  |                                              R/W                                              |  
+    localparam [7:0] NR50_rd_mask = 8'hFF;
     reg [7:0] NR50_reg = 8'b0;  
 	reg [7:0] NR50_reg_n;
     //  As of now there are no plans to support VIN
@@ -21,6 +26,7 @@ module APU (
 
     //  | CH4_LEFT  | CH3_LEFT  | CH2_LEFT  | CH1_LEFT  | CH4_RIGHT | CH3_RIGHT | CH2_RIGHT | CH1_RIGHT |
     //  |                                              R/W                                              |  
+    localparam [7:0] NR51_rd_mask = 8'hFF;
     reg [7:0] NR51_reg = 8'b0;
     reg [7:0] NR51_reg_n;
     wire CH4_LEFT = NR51_reg[7];
@@ -34,6 +40,7 @@ module APU (
 
     //  | MASTER_ON |                 -                 |  CH4_ON   |  CH3_ON   |  CH2_ON   |  CH1_ON   |
     //  |    R/W    |                                   |    R/O    |    R/O    |    R/O    |    R/O    |  
+    localparam [7:0] NR52_rd_mask = 8'h8F;
     reg [7:0] NR52_reg = 8'b0;
     reg [7:0] NR52_reg_n;
     wire MASTER_ON = NR52_reg[7];
@@ -97,7 +104,10 @@ module APU (
     );
 
     always @* begin
-        dout = sig_c1_dout | sig_c2_dout | sig_c3_dout | sig_c4_dout;
+        `ifdef DEBUG
+        dbg_we_regs = 0;
+        `endif
+        dout = 0;
         NR50_reg_n = NR50_reg;
         NR51_reg_n = NR51_reg;
         NR52_reg_n = {NR52_reg[7:4], sig_c4_on, sig_c3_on, sig_c2_on, sig_c1_on};
@@ -112,20 +122,38 @@ module APU (
 
         if ( re ) begin
             case ( addr )
-                NR50: dout = NR50_reg;
-                NR51: dout = NR51_reg;
-                NR52: dout = NR52_reg;
-                PCM12:dout = PCM12_reg;
-                PCM34:dout = PCM34_reg;
-                default:;//
+                NR50:   dout = NR50_reg | ~NR50_rd_mask;
+                NR51:   dout = NR51_reg | ~NR51_rd_mask;
+                NR52:   dout = NR52_reg | ~NR52_rd_mask;
+                PCM12:  dout = PCM12_reg;
+                PCM34:  dout = PCM34_reg;
+                UNUSED0,
+                UNUSED1,
+                UNUSED2,
+                UNUSED3,
+                UNUSED4,
+                UNUSED5,
+                UNUSED6,
+                UNUSED7,
+                UNUSED8,
+                UNUSED9,
+                UNUSEDA:dout = 8'hFF;
+                default:dout = sig_c1_dout | sig_c2_dout | sig_c3_dout | sig_c4_dout;
             endcase
         end
         if ( we ) begin
+            `ifdef DEBUG
+            dbg_we_regs = 1;
+            `endif
             case ( addr )
                 NR50: NR50_reg_n = din;
                 NR51: NR51_reg_n = din;
                 NR52: NR52_reg_n[7:4] = din[7:4];
+                `ifdef DEBUG
+                default: dbg_we_regs = 0;
+                `else
                 default:;//
+                `endif
             endcase
         end
 
@@ -136,6 +164,11 @@ module APU (
             right_amplified = right_sum * RIGHT_VOLUME;
             dac_left = left_amplified >> 3;
             dac_right = right_amplified >> 3;
+        end
+        else begin
+            // Turning off APU clears all registers except NR52 (and PCM registers)
+            NR50_reg_n = 0;
+            NR51_reg_n = 0;
         end
     end
 

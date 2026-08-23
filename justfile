@@ -2,6 +2,8 @@ set default-list := true
 BUILD_DIR := "build"
 BUILD_TYPE := "Release"
 OUTPUT_DIR := "./_out"
+# SDL_AUDIO := "SDL_AUDIODRIVER=dummy"
+SDL_AUDIO := ""
 
 [private]
 output_dir:
@@ -24,7 +26,7 @@ asm_boot: output_dir
     python3 bintoascii.py {{OUTPUT_DIR}}/boot.gb -o roms/testboot.mem -n 2304
 
 run:
-    ./{{BUILD_DIR}}/gbc_sim
+    {{SDL_AUDIO}} ./{{BUILD_DIR}}/gbc_sim
 
 sim: sim_surfer
 

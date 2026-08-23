@@ -1,6 +1,6 @@
 INCLUDE "hardware.inc"
 
-DEF GBDOC equ 0
+DEF GBDOC equ 1
  
 IF GBDOC == 1
 	PRINTLN "Assembling Gameboy Doctor bootrom"
@@ -63,6 +63,8 @@ ELSE
 
 	start:
 		di
+		ld a, LCDC_ON | LCDC_PRIO_ON
+		ld [rLCDC], a
 		ld sp, 0xFFFE
 		call pal_load
 		ld a, SYS_DMG

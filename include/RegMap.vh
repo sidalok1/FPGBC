@@ -1,5 +1,7 @@
 // Register Addresses
 
+localparam JOYP		= 16'hFF00;
+
 localparam SB		= 16'hFF01;
 localparam SC		= 16'hFF02;
 
@@ -15,6 +17,7 @@ localparam NR11     = 16'hFF11;
 localparam NR12     = 16'hFF12;
 localparam NR13     = 16'hFF13;
 localparam NR14     = 16'hFF14;
+localparam UNUSED0	= 16'hFF15;
 
 localparam NR21     = 16'hFF16;
 localparam NR22     = 16'hFF17;
@@ -25,7 +28,8 @@ localparam NR30     = 16'hFF1A;
 localparam NR31     = 16'hFF1B;
 localparam NR32     = 16'hFF1C;
 localparam NR33     = 16'hFF1D;
-localparam NR34     = 16'hFF1F;
+localparam NR34     = 16'hFF1E;
+localparam UNUSED1 	= 16'hFF1F;
 localparam SRAM_LOW = 16'hFF30;
 localparam SRAM_HIGH= 16'hFF3F;
 
@@ -37,6 +41,15 @@ localparam NR44     = 16'hFF23;
 localparam NR50     = 16'hFF24;
 localparam NR51     = 16'hFF25;
 localparam NR52     = 16'hFF26;
+localparam UNUSED2  = 16'hFF27;
+localparam UNUSED3  = 16'hFF28;
+localparam UNUSED4  = 16'hFF29;
+localparam UNUSED5  = 16'hFF2A;
+localparam UNUSED6  = 16'hFF2B;
+localparam UNUSED7  = 16'hFF2C;
+localparam UNUSED8  = 16'hFF2D;
+localparam UNUSED9  = 16'hFF2E;
+localparam UNUSEDA  = 16'hFF2F;
 
 localparam LCDC     = 16'hFF40;
 localparam STAT     = 16'hFF41;

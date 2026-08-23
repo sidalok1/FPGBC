@@ -86,6 +86,7 @@ SM83.xpr
 .vscode
 **.mem
 **.gb
+**.gbc
 !**/cgb_boot.mem
 *.dat
 
@@ -101,7 +102,9 @@ settings.json
 
 build
 _out
-
+*-main
+*docboy*
 mooneye*
 mts*
+gb-test-roms
 gameboy-doctor
