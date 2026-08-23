@@ -97,7 +97,7 @@ public:
 
 		} 
 		else {
-			SDL_Log("WARNING: Invalid cartridge memory access at: %x\n", addr);
+			SDL_Log("WARNING: Invalid cartridge memory access at: 0x%X\n", addr);
 			return 0xFF;
 		}
 	}
@@ -136,7 +136,7 @@ public:
 			}
 		}
 		else {
-			SDL_Log("WARNING: Invalid cartridge memory write at: %x\n", addr);
+			SDL_Log("WARNING: Invalid cartridge memory write at: 0x%X (val=0x%X)\n", addr, data);
 		}
 	}
 };
@@ -179,7 +179,7 @@ public:
 			}
 		} 
 		else {
-			SDL_Log("WARNING: Invalid cartridge memory access at: %x\n", addr);
+			SDL_Log("WARNING: Invalid cartridge memory access at: 0x%X\n", addr);
 			return 0xFF;
 		}
 	}
@@ -214,7 +214,7 @@ public:
 			}
 		} 
 		else {
-			SDL_Log("WARNING: Invalid cartridge memory write at: %x\n", addr);
+			SDL_Log("WARNING: Invalid cartridge memory write at: 0x%X (val=0x%X)\n", addr, data);
 		}
 	}
 };
@@ -271,7 +271,7 @@ std::unique_ptr<Cartridge> get_cartridge_from_romfile(const char* ROMFILE) {
 	case 0x00:
 	case 0x08:
 	case 0x09:
-		SDL_Log("No MBC\n");
+		SDL_Log("No MBC: $%X\n", header[0x47]);
 		romdata = std::vector<std::uint8_t>(romsize);
 		f.read(reinterpret_cast<char*>(romdata.data()), romsize);
 		f.close();
@@ -280,7 +280,7 @@ std::unique_ptr<Cartridge> get_cartridge_from_romfile(const char* ROMFILE) {
 	case 0x01:
 	case 0x02:
 	case 0x03:
-		SDL_Log("MBC1\n");
+		SDL_Log("MBC1: $%X\n", header[0x47]);
 		romdata = std::vector<std::uint8_t>(romsize);
 		f.read(reinterpret_cast<char*>(romdata.data()), romsize);
 		f.close();
@@ -292,7 +292,7 @@ std::unique_ptr<Cartridge> get_cartridge_from_romfile(const char* ROMFILE) {
 	case 0x19:
 	case 0x1A:
 	case 0x1B:
-		SDL_Log("MBC5\n");
+		SDL_Log("MBC5: $%X\n", header[0x47]);
 		romdata = std::vector<std::uint8_t>(romsize);
 		f.read(reinterpret_cast<char*>(romdata.data()), romsize);
 		f.close();

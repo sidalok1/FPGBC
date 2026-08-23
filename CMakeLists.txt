@@ -46,6 +46,7 @@ verilate(gbc_sim
         -y "roms" 
         -y "src"
         -y "src/APU_Channels"
+        -y "src/CPU_core_submodules"
         # --threads 1
         -Wall 
         -Wno-EOFNEWLINE
