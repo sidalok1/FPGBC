@@ -33,13 +33,13 @@ module MAC(
     wire [7:0] bootrom_data = bootrom[bootrom_addr];
 
     /*verilator tracing_off*/
-    reg [7:0] wram [0:7][0:4095]; // Eight banks of WRAM, selected with SVBK. Bank 0 always accessible
+    reg [7:0] wram [0:(4096*8)-1]; // Eight banks of WRAM, selected with SVBK. Bank 0 always accessible
     /*verilator tracing_on*/
-    reg [11:0] wram_addr;
-    reg [2:0] wram_bank_sel; // value of 0 selects bank 1
+    reg [14:0] wram_addr;
+    // reg [2:0] wram_bank_sel; // value of 0 selects bank 1
     reg wram_we;
     reg [7:0] wram_din;
-    wire [7:0] wram_dout = wram[wram_bank_sel][wram_addr];
+    wire [7:0] wram_dout = wram[wram_addr];
 
     reg cpu_addr_in_bootrom;
     reg ppu_addr_in_wram, cpu_addr_in_wram;
@@ -60,7 +60,7 @@ module MAC(
         end
         else if ( en ) begin
             if ( wram_we )
-                wram[wram_bank_sel][wram_addr] <= wram_din;
+                wram[wram_addr] <= wram_din;
             if ( cpu_we ) begin
                 case ( cpu_addr )
                 BANK: begin
@@ -79,7 +79,7 @@ module MAC(
     always @* begin
         bootrom_addr = 0;
         wram_addr = 0;
-        wram_bank_sel = 0;
+        // wram_bank_sel = 0;
         wram_din = 0;
         wram_we = 0;
         cart_addr = cpu_addr;
@@ -107,13 +107,14 @@ module MAC(
 
         if ( cpu_addr_in_wram || cpu_addr_in_echo ) begin
             wram_we = cpu_we;
-            wram_addr = cpu_addr_in_echo ? cpu_addr - 16'hE000 : cpu_addr - 16'hC000;
-            wram_bank_sel = 0;
+            wram_addr[11:0] = cpu_addr_in_echo ? cpu_addr - 16'hE000 : cpu_addr - 16'hC000;
+            wram_addr[14:12] = 3'b0;
         end
         else if ( cpu_addr_in_wram_banked || cpu_addr_echo_banked ) begin
-            wram_addr = cpu_addr_echo_banked ? cpu_addr - 16'hF000 : cpu_addr - 16'hD000;
+            wram_addr[11:0] = cpu_addr_echo_banked ? cpu_addr - 16'hF000 : cpu_addr - 16'hD000;
+            // wram_bank_sel = (SVBK_reg[2:0] == 0) ? 1 : SVBK_reg[2:0];
+            wram_addr[14:12] = (SVBK_reg[2:0] == 0) ? 3'd1 : SVBK_reg[2:0];
             wram_we = cpu_we;
-            wram_bank_sel = (SVBK_reg[2:0] == 0) ? 1 : SVBK_reg[2:0];
         end
         else if ( cpu_addr_in_cart ) begin
             if ( BANK_lock == 0 && cpu_addr_in_bootrom )
@@ -158,14 +159,14 @@ module MAC(
         if ( ppu_re ) begin
             if ( ppu_addr_in_wram || ppu_addr_in_echo ) begin
                 wram_we = 0;
-                wram_bank_sel = 0;
-                wram_addr = ppu_addr_in_echo ? ppu_addr - 16'hE000 : ppu_addr - 16'hC000;
+                wram_addr[11:0] = ppu_addr_in_echo ? ppu_addr - 16'hE000 : ppu_addr - 16'hC000;
+                wram_addr[14:12] = 3'b0;
                 ppu_din = wram_dout;
             end
             else if ( ppu_addr_in_wram_banked || ppu_addr_echo_banked ) begin
                 wram_we = 0;
-                wram_bank_sel = SVBK_reg[2:0] == 0 ? 1 : SVBK_reg[2:0];
                 wram_addr = ppu_addr_echo_banked ? ppu_addr - 16'hF000 : ppu_addr - 16'hD000;
+                wram_addr[14:12] = (SVBK_reg[2:0] == 0) ? 3'd1 : SVBK_reg[2:0];
                 ppu_din = wram_dout;
             end
             else if ( ppu_addr_in_cart ) begin
