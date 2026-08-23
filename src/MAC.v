@@ -147,7 +147,7 @@ module MAC(
                 wram_din = cpu_dout;
             end
             else if ( cpu_addr_in_cart ) begin
-                if ( !BANK_lock ) begin
+                if ( BANK_lock != 0 ) begin
                     cart_we = 1;
                     cart_din = cpu_dout;
                 end

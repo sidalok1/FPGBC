@@ -105,6 +105,8 @@ static constexpr int GBC_H       = 144;   // GBC visible lines
 // static constexpr int SCALE       = 1;     // Window scale factor
 // static constexpr int WIN_W       = GBC_W * SCALE;
 // static constexpr int WIN_H       = GBC_H * SCALE;
+constexpr double GB_FRAME_HZ = 4194304.0 / 70224.0;   // ≈ 59.7275 Hz — not exactly 60
+constexpr duration<double> FRAME_PERIOD(1.0 / GB_FRAME_HZ);
 
 // How many master-clock cycles to simulate before giving up if no frame arrives
 static constexpr uint64_t GB_SEC = 4e6;
@@ -340,6 +342,10 @@ int main(int argc, char** argv) {
     int pixels_on_line = 0;
     uint64_t frame = 0;
     bool prefixed = false;
+
+    auto sim_start = steady_clock::now();
+    uint64_t frame_count = 0;
+
     while (running && cycle < MAX_CYCLES && !ctx->gotFinish()) {
     // while (running) {
 
@@ -350,18 +356,6 @@ int main(int argc, char** argv) {
         }
         #endif
         gbc->clk = 0; gbc->eval();
-        #ifdef EMULATE_CARTRIDGE
-        if ( gbc->cart_we ) {
-            uint16_t addr = gbc->addr_line;
-            uint8_t data = gbc->soc_to_cart_data;
-            cart->write(addr, data);
-        }
-        if ( gbc->cart_re ) {
-            uint16_t addr = gbc->addr_line;
-            uint8_t data = cart->read(addr);
-            gbc->cart_to_soc_data = data;
-        }
-        #endif
         #ifdef GBDOC_FILE
         if ( BANKL == 1 && PHASE == 0 && ((FETCH == 1 && ITRSV == 0) || PREFX == 1) ){
             uint16_t SP = (RSP_H << 8) | RSP_L;
@@ -433,6 +427,19 @@ int main(int argc, char** argv) {
         #endif
         ctx->timeInc(clk_period_half); seconds += 1/4e6;
         gbc->clk = 1; gbc->eval();
+        #ifdef EMULATE_CARTRIDGE
+        if ( gbc->cart_we ) {
+            uint16_t addr = gbc->addr_line;
+            uint8_t data = gbc->soc_to_cart_data;
+            // SDL_Log("Cartridge write at address 0x%X of value 0x%X\n", addr, data);
+            cart->write(addr, data);
+        }
+        if ( gbc->cart_re ) {
+            uint16_t addr = gbc->addr_line;
+            uint8_t data = cart->read(addr);
+            gbc->cart_to_soc_data = data;
+        }
+        #endif
         #ifdef TIME
         if ( cycle % CYCLE_INTERVAL == 0 ){
             end = high_resolution_clock::now();
@@ -520,6 +527,10 @@ int main(int argc, char** argv) {
         bool vsync_rising  = (prev_vsync == 0) && (gbc->vsync == 1);
 
         if (vsync_falling) {
+            frame_count++;
+            auto target_time = sim_start +
+                duration_cast<steady_clock::duration>(frame_count * FRAME_PERIOD);
+            std::this_thread::sleep_until(target_time);
             #ifdef PRINT_CYCLE
             std::cout << cycle << std::endl;
             #endif

@@ -74,13 +74,13 @@ public:
 			if ( banking_mode == advanced ) {
 				romaddr |= bank_reg_high << 19;
 			}
-			return ROM[romaddr % ROM.size()];
+			return ROM[romaddr % ROM.capacity()];
 		}
 		else if ( addr >= 0x4000 && addr <= 0x7FFF ) {
+			std::uint8_t bank = bank_reg_low | (bank_reg_high << 5);
 			std::uint32_t romaddr = (addr & 0x3FFF) | 
-									(bank_reg_low << 14) |
-									(bank_reg_high<< 19);
-			return ROM[romaddr % ROM.size()];
+									(bank << 14);
+			return ROM[romaddr % ROM.capacity()];
 		}
 		else if ( addr >= 0xA000 && addr <= 0xBFFF ) {
 			if ( !RAM_enable ) {
@@ -92,7 +92,7 @@ public:
 				if ( banking_mode == advanced ) {
 					ramaddr |= bank_reg_high << 13;
 				}
-				return RAM[ramaddr % RAM.size()];
+				return RAM[ramaddr % RAM.capacity()];
 			}
 
 		} 
@@ -102,7 +102,7 @@ public:
 		}
 	}
 	void write(std::uint16_t addr, std::uint8_t data) override {
-		if ( addr >= 0x0000 && addr <= 0xFF11 ) {
+		if ( addr >= 0x0000 && addr <= 0x1FFF ) {
 			if ( (data & 0x0F) == 0x0A ) {
 				RAM_enable = true;
 			}
@@ -120,7 +120,10 @@ public:
 		else if ( addr >= 0x4000 && addr <= 0x5FFF ) {
 			bank_reg_high = data & 0x03;
 		}
-		if ( addr >= 0xA000 && addr <= 0xBFFF ) {
+		else if ( addr >= 0x6000 && addr <= 0x7FFF ) {
+			banking_mode = data & 0x01;
+		}
+		else if ( addr >= 0xA000 && addr <= 0xBFFF ) {
 			if ( !RAM_enable ) {
 				SDL_Log("WARNING: Attempt to write to disabled cartridge RAM\n");
 			}
@@ -129,8 +132,11 @@ public:
 				if ( banking_mode == advanced ) {
 					ramaddr |= bank_reg_high << 13;
 				}
-				RAM[ramaddr % RAM.size()] = data;
+				RAM[ramaddr % RAM.capacity()] = data;
 			}
+		}
+		else {
+			SDL_Log("WARNING: Invalid cartridge memory write at: %x\n", addr);
 		}
 	}
 };
@@ -146,7 +152,7 @@ public:
 		std::vector<std::uint8_t> RAMBANKS ) {
 		ROM = ROMBANKS;
 		RAM = RAMBANKS;
-		ROM_bank = 0;
+		ROM_bank = 0x0001;
 		RAM_bank = 0;
 		RAM_enable = false;
 		
@@ -155,12 +161,12 @@ public:
 	std::uint8_t read(std::uint16_t addr) override {
 		if ( addr >= 0x0000 && addr <= 0x3FFF ) {
 			std::uint32_t romaddr = addr & 0x3FFF;
-			return ROM[romaddr % ROM.size()];
+			return ROM[romaddr % ROM.capacity()];
 		}
 		else if ( addr >= 0x4000 && addr <= 0x7FFF ) {
 			std::uint32_t romaddr = (addr & 0x3FFF) | 
 									(ROM_bank << 14);
-			return ROM[romaddr % ROM.size()];
+			return ROM[romaddr % ROM.capacity()];
 		}
 		else if ( addr >= 0xA000 && addr <= 0xBFFF ) {
 			if ( !RAM_enable ) {
@@ -169,9 +175,8 @@ public:
 			}
 			else {
 				std::uint16_t ramaddr = (addr & 0x1FFF) | (RAM_bank << 13);
-				return RAM[ramaddr % RAM.size()];
+				return RAM[ramaddr % RAM.capacity()];
 			}
-
 		} 
 		else {
 			SDL_Log("WARNING: Invalid cartridge memory access at: %x\n", addr);
@@ -179,8 +184,9 @@ public:
 		}
 	}
 	void write(std::uint16_t addr, std::uint8_t data) override {
-		if ( addr >= 0x0000 && addr <= 0xFF11 ) {
-			if ( (data & 0x0F) == 0x0A ) {
+		if ( addr >= 0x0000 && addr <= 0x1FFF ) {
+			// if ( (data & 0x0F) == 0x0A ) {
+			if ( data == 0x0A ) {
 				RAM_enable = true;
 			}
 			else {
@@ -198,14 +204,17 @@ public:
 		else if ( addr >= 0x4000 && addr <= 0x5FFF ) {
 			RAM_bank = data & 0x0F;
 		}
-		if ( addr >= 0xA000 && addr <= 0xBFFF ) {
+		else if ( addr >= 0xA000 && addr <= 0xBFFF ) {
 			if ( !RAM_enable ) {
 				SDL_Log("WARNING: Attempt to write to disabled cartridge RAM\n");
 			}
 			else {
 				std::uint16_t ramaddr = (addr & 0x1FFF) | (RAM_bank << 13);
-				RAM[ramaddr % RAM.size()] = data;
+				RAM[ramaddr % RAM.capacity()] = data;
 			}
+		} 
+		else {
+			SDL_Log("WARNING: Invalid cartridge memory write at: %x\n", addr);
 		}
 	}
 };
@@ -223,10 +232,10 @@ std::unique_ptr<Cartridge> get_cartridge_from_romfile(const char* ROMFILE) {
 	std::uint32_t romsize;
 	if ( header[0x48] >= 0x00 && header[0x48] <= 0x08 ) {
 		romsize = 0x8000 * (1 << header[0x48]);
-		SDL_Log("ROM size: %dKiB\n", 32*(1<<header[0x48]));
+		SDL_Log("ROM size: %dKiB (val = 0x%0X)\n", 32*(1<<header[0x48]), header[0x48]);
 	}
 	else {
-		SDL_Log("ERROR: Invalid ROM size value: %x\n", header[0x48]);
+		SDL_Log("ERROR: Invalid ROM size value: 0x%X\n", header[0x48]);
 		return nullptr;
 	}
 	std::uint32_t ramsize;
@@ -277,6 +286,8 @@ std::unique_ptr<Cartridge> get_cartridge_from_romfile(const char* ROMFILE) {
 		f.close();
 		ramdata = std::vector<std::uint8_t>(ramsize);
 		cart = std::unique_ptr<Cartridge>(static_cast<Cartridge*>(new MBC1(romdata, ramdata)));
+		SDL_Log("Generated ROM size: %d\n", romdata.capacity());
+		SDL_Log("Generated RAM size: %d\n", ramdata.capacity());
 		return cart;
 	case 0x19:
 	case 0x1A:
@@ -287,6 +298,8 @@ std::unique_ptr<Cartridge> get_cartridge_from_romfile(const char* ROMFILE) {
 		f.close();
 		ramdata = std::vector<std::uint8_t>(ramsize);
 		cart = std::unique_ptr<Cartridge>(static_cast<Cartridge*>(new MBC5(romdata, ramdata)));
+		SDL_Log("Generated ROM size: %d\n", romdata.capacity());
+		SDL_Log("Generated RAM size: %d\n", ramdata.capacity());
 		return cart;
 	default:
 		SDL_Log("ERROR: That MBC is not yet implemented: %x\n", header[0x47]);
