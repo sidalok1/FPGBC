@@ -31,6 +31,14 @@ module ControlUnit(
     `ifdef DEBUG
     output reg dbg_break;
     wire [8:0] dbg_state;
+    reg dbg_branch_taken;
+    reg dbg_branch_not_taken;
+    reg dbg_called;
+    reg dbg_returned;
+    integer dbg_stack_level = 0;
+    reg dbg_isr_called;
+    reg dbg_isr_returned;
+    integer dbg_isr_stack_level = 0;
     `endif
     input wire          clk;
     input wire          en;
@@ -55,16 +63,20 @@ module ControlUnit(
     output reg [3:0] clear_flags;
 
     reg [7:0] IR;
+    reg [7:0] IR_prefix;
     reg fetch = 1;
+    reg fetch_prefix = 0;
     reg read_from_mem = 0;
-    assign read = fetch | read_from_mem;
+    assign read = fetch | fetch_prefix | read_from_mem;
     
     reg [5:0] state = S0, next = S0;
     reg [5:0] intr_state = S0, intr_state_n, intr_return_state = S0, intr_return_state_n;
-    reg prefix = 0, prefix_next = 0, prefix_return = 0, prefix_return_n;
+    // reg prefix = 0, prefix_next = 0, prefix_return = 0, prefix_return_n;
+
+    reg service_interrupt = 0, service_interrupt_n;
 
     reg IME;
-    reg set_IME = 0, set_IME_next = 0, unset_IME;
+    reg set_IME, unset_IME;
 
     wire [2:0] next_interrupt;
     wire intr_valid;
@@ -149,7 +161,8 @@ module ControlUnit(
     // end
 
     `ifdef DEBUG
-    assign dbg_state = {prefix, IR};
+    // assign dbg_state = {prefix, IR};
+    assign dbg_state = {1'b0, IR};
     `endif
 
     always @ ( posedge clk ) begin
@@ -158,34 +171,54 @@ module ControlUnit(
             intr_state <= S0;
             intr_return_state <= 0;
             IR <= 0;
-            set_IME_next <= 0;
+            IR_prefix <= 0;
+            // set_IME_next <= 0;
             IME <= 0;
-            prefix <= 0;
-            prefix_return <= 0;
+            service_interrupt <= 0;
+            // prefix <= 0;
+            // prefix_return <= 0;
             ack_IF <= 0;
+            `ifdef DEBUG
+            dbg_stack_level <= 0;
+            dbg_isr_stack_level <= 0;
+            `endif
         end
         else if ( en ) begin
             state <= next;
             intr_state <= intr_state_n;
             intr_return_state <= intr_return_state_n;
+            service_interrupt <= service_interrupt_n;
             if ( fetch ) begin
                 IR <= data;
             end
-            if ( set_IME ) begin
-                set_IME_next <= 1;
-            end else begin
-                set_IME_next <= 0;
+            if ( fetch_prefix ) begin
+                IR_prefix <= data;
             end
+            // if ( set_IME ) begin
+            //     set_IME_next <= 1;
+            // end else begin
+            //     set_IME_next <= 0;
+            // end
             if ( unset_IME ) begin
                 IME <= 0;
-            end else if ( set_IME_next ) begin
+            end else if ( set_IME ) begin
                 IME <= 1;
             end else begin
                 IME <= IME;
             end
-            prefix <= prefix_next;
-            prefix_return <= prefix_return_n;
+            // prefix <= prefix_next;
+            // prefix_return <= prefix_return_n;
             ack_IF <= ack_IF_n;
+            `ifdef DEBUG
+            if ( dbg_called )
+                dbg_stack_level <= dbg_stack_level + 1;
+            else if ( dbg_returned )
+                dbg_stack_level <= dbg_stack_level - 1;
+            if ( dbg_isr_called )
+                dbg_isr_stack_level <= dbg_isr_stack_level + 1;
+            else if ( dbg_isr_returned )
+                dbg_isr_stack_level <= dbg_isr_stack_level - 1;
+            `endif
         end
     end
 
@@ -193,7 +226,9 @@ module ControlUnit(
         next = S0;
         intr_state_n = S0;
         intr_return_state_n = intr_return_state;
+        service_interrupt_n = service_interrupt;
         fetch = 0;
+        fetch_prefix = 0;
         write = 0;
         read_from_mem = 0;
         r1 = CTR;
@@ -210,8 +245,8 @@ module ControlUnit(
         data_sel = DIN;
         set_IME = 0;
         unset_IME = 0;
-        prefix_next = 0;
-        prefix_return_n = prefix_return;
+        // prefix_next = 0;
+        // prefix_return_n = prefix_return;
         ack_IF_n = 0;
         stop = 0;
         halt = 0;
@@ -219,16 +254,25 @@ module ControlUnit(
         clear_flags = 4'b0;
         `ifdef DEBUG
         dbg_break = 0;
+        dbg_branch_taken = 0;
+        dbg_branch_not_taken = 0;
+        dbg_called = 0;
+        dbg_returned = 0;
+        dbg_isr_called = 0;
+        dbg_isr_returned = 0;
         `endif
 
         // begin state logic
-        if ( IME & intr_valid ) begin
+        // if ( IME & intr_valid & (IR != 8'b11_110_011) ) begin
+        if ( service_interrupt ) begin
             // Interrupt handler
+            // Executes if interrupts are enabled, there is an interrupt to service,
+            // and if interrupts are not being disabled
             case ( intr_state ) 
             S0: begin
-                // save current state, to return to on reti
-                intr_return_state_n = state;
-                prefix_return_n = prefix;
+                // TODO: should ISR return to S0 or the current state?
+                // intr_return_state_n = state;
+                // prefix_return_n = prefix;
                 addrh = SPH;
                 addrl = SPL;
                 idu_op = DEC;
@@ -269,63 +313,65 @@ module ControlUnit(
                 ack_IF_n[next_interrupt] = 1;
                 unset_IME = 1;
                 fetch = 1;
+                service_interrupt_n = 0;
             end
             default:; // one-hot
             endcase
         end
-        else if ( prefix ) begin 
-            // prefixed instructions
-            prefix_next = 1;
-            case ( state )
-            S0: begin
-                if ( IR[2:0] == 'b110 ) begin // OP xxx, [hl]
-                    next = S1;
-                    addrh = H;
-                    addrl = L;
-                    rd = Z;
-                    data_sel = DIN;
-                    read_from_mem = 1;
-                end else begin
-                    rd = (IR[7:6] == 2'b01) ? CTR : {1'b0, IR[2:0]}; // no rd for BIT
-                    r1 = {1'b0, IR[2:0]};
-                    r2 = CTR;
-                    ctr = {5'b0, IR[5:3]};
-                    alu_op = {2'b10, IR[7:6]};
-                    data_sel = ALU;
-                    flag_mask = ALLFLAG;
-                    rd_idu = PC;
-                    fetch = 1;
-                    prefix_next = 0;
-                end
-            end
-            S1: begin
-                if ( IR[7:6] == 2'b01 ) begin // BIT u3, [hl]
-                    rd_idu = PC;
-                    fetch = 1;
-                    prefix_next = 0;
-                end
-                else begin
-                    data_sel = ALU;
-                    addrh = H;
-                    addrl = L;
-                    write = 1;
-                    next = S2;
-                end
-                r1 = Z;
-                r2 = CTR;
-                ctr = {5'b0, IR[5:3]};
-                alu_op = {2'b10, IR[7:6]};
-                flag_mask = ALLFLAG;
-            end
-            S2: begin
-                rd_idu = PC;
-                fetch = 1;
-                prefix_next = 0;
-            end
-            default:; // one-hot
-            endcase
-        end
-        else casez ( IR )
+        // else if ( prefix ) begin 
+        //     // prefixed instructions
+        //     prefix_next = 1;
+        //     case ( state )
+        //     S0: begin
+        //         if ( IR[2:0] == 'b110 ) begin // OP xxx, [hl]
+        //             next = S1;
+        //             addrh = H;
+        //             addrl = L;
+        //             rd = Z;
+        //             data_sel = DIN;
+        //             read_from_mem = 1;
+        //         end else begin
+        //             rd = (IR[7:6] == 2'b01) ? CTR : {1'b0, IR[2:0]}; // no rd for BIT
+        //             r1 = {1'b0, IR[2:0]};
+        //             r2 = CTR;
+        //             ctr = {5'b0, IR[5:3]};
+        //             alu_op = {2'b10, IR[7:6]};
+        //             data_sel = ALU;
+        //             flag_mask = ALLFLAG;
+        //             rd_idu = PC;
+        //             fetch = 1;
+        //             prefix_next = 0;
+        //         end
+        //     end
+        //     S1: begin
+        //         if ( IR[7:6] == 2'b01 ) begin // BIT u3, [hl]
+        //             rd_idu = PC;
+        //             fetch = 1;
+        //             prefix_next = 0;
+        //         end
+        //         else begin
+        //             data_sel = ALU;
+        //             addrh = H;
+        //             addrl = L;
+        //             write = 1;
+        //             next = S2;
+        //         end
+        //         r1 = Z;
+        //         r2 = CTR;
+        //         ctr = {5'b0, IR[5:3]};
+        //         alu_op = {2'b10, IR[7:6]};
+        //         flag_mask = ALLFLAG;
+        //     end
+        //     S2: begin
+        //         rd_idu = PC;
+        //         fetch = 1;
+        //         prefix_next = 0;
+        //     end
+        //     default:; // one-hot
+        //     endcase
+        // end
+        else 
+        casez ( IR )
         'b00_000_000: begin
             // nop
             rd_idu = PC;
@@ -697,7 +743,13 @@ module ControlUnit(
                 cc = IR[4:3];
                 if ( cc_true ) begin
                     next = S2;
+                    `ifdef DEBUG
+                    dbg_branch_taken = 1;
+                    `endif  
                 end else begin
+                    `ifdef DEBUG
+                    dbg_branch_not_taken = 1;
+                    `endif  
                     next = S1;
                 end
             end
@@ -833,8 +885,15 @@ module ControlUnit(
             S0: begin
                 cc = IR[4:3];
                 if ( cc_true ) begin
+                    `ifdef DEBUG
+                    dbg_branch_taken = 1;
+                    dbg_returned = 1;
+                    `endif  
                     next = S1;
                 end else begin
+                    `ifdef DEBUG
+                    dbg_branch_not_taken = 1;
+                    `endif  
                     next = S4;
                 end
             end
@@ -901,15 +960,30 @@ module ControlUnit(
                 next = S3;
             end
             S3: begin
-                if ( IR[4] ) begin // if returning from interrupt, go to previous state
-                    // next = intr_return_state;
-                    next = S0;
-                    prefix_next = prefix_return;
-                end 
-                else begin
-                    next = S0;
-                    prefix_next = 0;
+                // if ( IR[4] ) begin // if returning from interrupt, go to previous state
+                //     // next = intr_return_state;
+                //     next = S0;
+                //     prefix_next = prefix_return;
+                //     `ifdef DEBUG
+                //     dbg_isr_returned = 1;
+                //     `endif
+                // end 
+                // else begin
+                //     next = S0;
+                //     prefix_next = 0;
+                //     `ifdef DEBUG
+                //     dbg_returned = 1;
+                //     `endif
+                // end
+                `ifdef DEBUG
+                if ( IR[4] ) begin
+                    dbg_isr_returned = 1;
                 end
+                else begin
+                    dbg_returned = 1;
+                end
+                `endif
+                next = S0;
                 rd_idu = PC;
                 fetch = 1;
             end
@@ -976,8 +1050,14 @@ module ControlUnit(
                 rd_idu = PC;
                 cc = IR[4:3];
                 if ( cc_true ) begin
+                    `ifdef DEBUG
+                    dbg_branch_taken = 1;
+                    `endif  
                     next = S2;
                 end else begin
+                    `ifdef DEBUG
+                    dbg_branch_not_taken = 1;
+                    `endif  
                     next = S3;
                 end
             end
@@ -1046,7 +1126,14 @@ module ControlUnit(
                     rd = W;
                     rd_idu = PC;
                     next = S2;
+                    `ifdef DEBUG
+                    dbg_branch_taken = 1;
+                    dbg_called = 1;
+                    `endif  
                 end else begin
+                    `ifdef DEBUG
+                    dbg_branch_not_taken = 1;
+                    `endif  
                     rd_idu = WZ;
                     next = S5;
                 end
@@ -1128,6 +1215,9 @@ module ControlUnit(
                 addrl = Z;
                 rd_idu = PC;
                 fetch = 1;
+                `ifdef DEBUG
+                dbg_called = 1;
+                `endif
             end
             default:; // one-hot
             endcase
@@ -1492,17 +1582,85 @@ module ControlUnit(
                 // idu_op = ZER;
                 rd_idu = PC;
                 fetch = 1;
+                `ifdef DEBUG
+                dbg_called = 1;
+                `endif
             end
             default:; // one-hot
             endcase
         end
         'hCB: begin
             // prefix
-            prefix_next = 1;
-            rd_idu = PC;
-            fetch = 1;
+            // prefix_next = 1;
+            // rd_idu = PC;
+            // fetch = 1;
+            case ( state )
+            S0: begin
+                rd_idu = PC;
+                fetch_prefix = 1;
+                next = S1;
+            end
+            S1: begin
+                if ( IR_prefix[2:0] == 3'b110 ) begin // OP xxx, [hl]
+                    next = S2;
+                    addrh = H;
+                    addrl = L;
+                    rd = Z;
+                    data_sel = DIN;
+                    read_from_mem = 1;
+                end
+                else begin
+                    rd = (IR_prefix[7:6] == 2'b01) ? CTR : {1'b0, IR_prefix[2:0]}; // no rd for BIT
+                    r1 = {1'b0, IR_prefix[2:0]};
+                    r2 = CTR;
+                    ctr = {5'b0, IR_prefix[5:3]};
+                    alu_op = {2'b10, IR_prefix[7:6]};
+                    data_sel = ALU;
+                    flag_mask = ALLFLAG;
+                    rd_idu = PC;
+                    fetch = 1;
+                end
+            end
+            S2: begin
+                if ( IR_prefix[7:6] == 2'b01 ) begin // BIT u3, [hl]
+                    rd_idu = PC;
+                    fetch = 1;
+                end
+                else begin
+                    data_sel = ALU;
+                    addrh = H;
+                    addrl = L;
+                    write = 1;
+                    next = S3;
+                end
+                r1 = Z;
+                r2 = CTR;
+                ctr = {5'b0, IR_prefix[5:3]};
+                alu_op = {2'b10, IR_prefix[7:6]};
+                flag_mask = ALLFLAG;
+            end
+            S3: begin
+                rd_idu = PC;
+                fetch = 1;
+            end
+            default:;//
+            endcase
         end
         endcase
+
+        if ( (fetch && !service_interrupt) || (halt) || (stop) ) begin // check if interrupt should be serviced
+            if ( IME & intr_valid & (IR != 8'b11_110_011) ) begin
+                service_interrupt_n = 1;
+                idu_op = ZER;
+                `ifdef DEBUG
+                dbg_isr_called = 1;
+                `endif
+            end
+            else if ( wake ) begin
+                rd_idu = PC;
+                fetch = 1;
+            end
+        end
     end
 
     
