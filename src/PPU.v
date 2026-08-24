@@ -265,6 +265,7 @@ module PPU (
         reg obj_fifo_push;
 
         reg [7:0] output_x = 0, output_x_n;
+        reg [2:0] discard_x = 0, discard_x_n;
         reg halt_output;
         // same format as fifo pixels, but idx 0 is 0 for background/window and 1 for objects
         reg [5:0] mixed_pixel = 0, mixed_pixel_n, mixed_pixel0 = 0, mixed_pixel0_n;
@@ -447,6 +448,7 @@ module PPU (
             obj_low <= 0;
             obj_high <= 0;
             output_x <= 0;
+            discard_x <= 0;
             mixed_pixel <= 0;
             mixed_pixel0 <= 0;
             rgb_low <= 0;
@@ -546,6 +548,7 @@ module PPU (
                 obj_high <= obj_high_n;
 
                 output_x <= output_x_n;
+                discard_x <= discard_x_n;
 
                 mixed_pixel <= mixed_pixel_n;
                 mixed_pixel0 <= mixed_pixel0_n;
@@ -687,6 +690,7 @@ module PPU (
         obj_high_n                      = obj_high;
 
         output_x_n                      = output_x;
+        discard_x_n                     = discard_x;              
         halt_output                     = 0;
 
         mixed_pixel_n                   = mixed_pixel;
@@ -799,22 +803,23 @@ module PPU (
 
         // if output_x == WX_reg, then the NEXT pixel is part of the window
         // for example, output_x == 8 corresponds to pixel 0, output_x triggers one cycle before
+        // win_trigger = (output_x == WX_reg + (SCX_reg % 8)) && ((LY_reg == WY_reg) || win_y_cond) && WIN_EN;
         win_trigger = (output_x == WX_reg) && ((LY_reg == WY_reg) || win_y_cond) && WIN_EN;
-        obj_trigger = obj_priority_valid;
         obj_height = (OBJ_SIZE == 0) ? 8 : 16;
         for ( i = 0; i < 10; i = i + 1 )
-            if ( obj_arr[i][1] == output_x - (SCX_reg & 8'h7) )
+            // if ( obj_arr[i][1] + (SCX_reg % 8) == output_x )
+            if ( obj_arr[i][1] == output_x )
                 obj_x_hit[i] = 1;
             else
                 obj_x_hit[i] = 0;
-
+        obj_trigger = obj_priority_valid;
         
         data_base = (TILE_SEL == 0) ? 13'h1000 : 13'h0000;
         tile_base = (TILE_SEL == 0) ?   $signed(data_base) + (13'($signed(tile_idx)) * 16) : 
                                         data_base + (13'(tile_idx) * 16);
         if ( bgr_state ) begin
             map_base = (BG_MAP == 0) ? 13'h1800 : 13'h1C00;
-            pix_x = (fetch_counter*8) + (SCX_reg & ~8'h07);
+            pix_x = (fetch_counter*8) + (SCX_reg);
             pix_y = LY_reg + SCY_reg;
         end
         else begin
@@ -893,6 +898,7 @@ module PPU (
 
                             win_x_n = 0;
                             output_x_n = 0;
+                            discard_x_n = SCX_reg[2:0];
 
                             fetcher_state_n = fetcher_bgr_map_addr;
                             bgr_fifo_flush_n = 1;
@@ -911,27 +917,34 @@ module PPU (
 
                 // output stage
                 // Increment output_x during initial fetch
-                if ( !obj_trigger && !obj_state && output_x < 8 )
+                if ( !obj_trigger && !obj_state && output_x < 8 ) begin
                     output_x_n = output_x + 1;
+                    obj_fifo_read = 1;
+                end
+                else
+                if ( !obj_trigger && !obj_state && discard_x > 0 ) begin
+                    bgr_fifo_read = 1;
+                    // obj_fifo_read = 1;
+                    discard_x_n = discard_x - 1;
+                end
                 else
                 if ( !(obj_trigger || obj_state || bgr_fifo_flush || bgr_fifo_len == 0) ) begin 
                     // any of these conditions stalls the output
                     // obj_with_priority may get set to 4'hF while data is yet to be pushed to obj_fifo
                     // if ( win_state )
                     //     win_x_n = win_x + 1;
-                    if ( output_x < (8 + (SCX_reg & 8'h7)) || output_x >= (168 + (SCX_reg & 8'h7)) ) begin
-                        de2_n = 0;
-                    end
-                    else begin
-                        de2_n = 1;
-                    end
-                    // de2_n = output_x < 168 ? 1 : 0;
+                    // if ( output_x < (8 + (SCX_reg & 8'h7)) || output_x >= (168 + (SCX_reg & 8'h7)) ) begin
+                    //     de2_n = 0;
+                    // end
+                    // else begin
+                    //     de2_n = 1;
+                    // end
+                    de2_n = output_x < 168 ? 1 : 0;
                     output_x_n = output_x + 1;
                     bgr_fifo_read = 1;
                     
                     // Stage 0
                     if ( DMG_mode ) begin
-                    // In DMG mode the pallete used might actually be from CRAM? Need to check documentation
                         if ( obj_fifo_len > 0 ) begin
                             obj_fifo_read = 1;
                             if ( (BG_EN == 1) ) begin
@@ -999,7 +1012,8 @@ module PPU (
                 r_n = rgb_low[4:0];
                 g_n = {rgb_high[1:0], rgb_low[7:5]};
                 b_n = rgb_high[6:2];
-                if ( output_x >= (168 + (SCX_reg & 8'h7)) && !(de0 | de1 | de2) ) begin
+                // if ( output_x >= (168 + (SCX_reg & 8'h7)) && !(de0 | de1 | de2) ) begin
+                if ( output_x >= 168 && !(de0 | de1 | de2) ) begin
                     // Wait for output pipeline to empty
                     next_mode = h_blank;
                 end
