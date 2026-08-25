@@ -923,7 +923,7 @@ module PPU (
                 end
                 else
                 if ( !obj_trigger && !obj_state && discard_x > 0 ) begin
-                    bgr_fifo_read = 1;
+                    bgr_fifo_read = (win_state) ? 0 : 1;
                     // obj_fifo_read = 1;
                     discard_x_n = discard_x - 1;
                 end
