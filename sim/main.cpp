@@ -53,6 +53,8 @@
 
 #include <SDL3/SDL.h>
 
+#include <filesystem>
+
 #include <cstdint>
 // #include <cstdio>
 #include <iostream>
@@ -189,7 +191,8 @@ int main(int argc, char** argv) {
         SDL_Log("ERROR: must pass in ROM file\n");
         return 1;
     }
-    std::unique_ptr<Cartridge> cart = get_cartridge_from_romfile(argv[1]);
+    std::filesystem::path rompath(argv[1]);
+    std::unique_ptr<Cartridge> cart = get_cartridge_from_romfile(rompath);
     if ( !cart ) {
         SDL_Log("ERROR: Cartridge creation failed\n");
         return 1;
@@ -240,7 +243,7 @@ int main(int argc, char** argv) {
         return 1;
     }
     SDL_Window* window = SDL_CreateWindow(
-        "GBC PPU Simulation",
+        "FPGbC",
         WIN_W, WIN_H,
         // GBC_W, GBC_H,
         SDL_WINDOW_RESIZABLE
