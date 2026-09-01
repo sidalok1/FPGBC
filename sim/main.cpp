@@ -53,6 +53,11 @@
 
 #include <SDL3/SDL.h>
 
+#include <argparse/argparse.hpp>
+
+#define DOCTEST_CONFIG_IMPLEMENT
+#include "doctest.h"
+
 #include <filesystem>
 
 #include <cstdint>
@@ -171,6 +176,27 @@ static inline uint8_t expand5to8(uint8_t v5) {
 // main
 // -------------------------------------------------------------------------
 int main(int argc, char** argv) {
+    doctest::Context doctest_ctx;
+    doctest_ctx.applyCommandLine(argc, argv);
+
+    argparse::ArgumentParser parser("gbc-sim");
+
+    // auto& group = parser.add_mutually_exclusive_group(true);
+
+    // group.add_argument("romfile")
+    //     .help("Binary containing the game's ROM");
+
+    // group.add_argument("-t", "--test")
+    //     .help("Run tests on helper functions")
+    //     .flag();
+
+    parser.add_argument("romfile")
+        .help("Binary containing game's ROM")
+        .default_value(".");
+    parser.add_argument("-t", "--test")
+        .help("Run tests on helper functions")
+        .flag();
+
     #ifdef TIME
     auto start = high_resolution_clock::now();
     #endif
@@ -184,15 +210,23 @@ int main(int argc, char** argv) {
     // Vgbc* gbc = new Vgbc{ctx};
 
     #ifdef EMULATE_CARTRIDGE
-    // Right now cartridge emulation only supports ROM and RAM banks, but I want to
-    // eventually extend this to RTC modules, battery-backed RAM, and possibly even
-    // rumble via screen shaking
-    if ( argc < 2 ) {
-        SDL_Log("ERROR: must pass in ROM file\n");
-        return 1;
+    try {
+        parser.parse_args(argc, argv);
     }
-    std::filesystem::path rompath(argv[1]);
+    catch (const std::exception& err) {
+        std::cerr << err.what() << std::endl;
+        std::cerr << parser << std::endl;
+        std::exit(1);
+    }
+
+    if ( parser["--test"] == true ) {
+        return doctest_ctx.run();
+    }
+
+    auto romfile = parser.get<std::string>("romfile");
+    std::filesystem::path rompath(romfile);
     std::unique_ptr<Cartridge> cart = get_cartridge_from_romfile(rompath);
+
     if ( !cart ) {
         SDL_Log("ERROR: Cartridge creation failed\n");
         return 1;

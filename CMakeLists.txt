@@ -1,9 +1,16 @@
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.25)
 cmake_policy(SET CMP0144 NEW)
 project(gbc_sim CXX)
 
-# set(CMAKE_CXX_STANDARD 26)
+set(CMAKE_CXX_STANDARD 26)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+include(FetchContent)
+FetchContent_Declare(
+    argparse
+    GIT_REPOSITORY https://github.com/p-ranav/argparse.git
+)
+FetchContent_MakeAvailable(argparse)
 
 # ---------------------------------------------------------------------------
 # Find Verilator
@@ -32,6 +39,7 @@ endif()
 # Verilate the RTL and create a simulation executable
 # ---------------------------------------------------------------------------
 add_executable(gbc_sim sim/main.cpp sim/cartridge.cpp)
+# target_link_options(gbc_sim PRIVATE "-Wl,-rpath,/opt/gcc-16/lib64")
 include_directories(include)
 
 set(HDL_SOURCES
@@ -48,7 +56,8 @@ verilate(gbc_sim
         -y "src/APU_Channels"
         -y "src/CPU_core_submodules"
         # --threads 1
-        -Wall 
+        -Wall
+        -Werror-LATCH
         -Wno-EOFNEWLINE
         -Wno-UNUSED
         -Wno-UNSIGNED
@@ -76,8 +85,17 @@ verilate(gbc_sim
     # TRACE_FST
     PREFIX        Vgbc
 )
+
+include(CheckCXXCompilerFlag)
+check_cxx_compiler_flag(-Wdeprecated-variadic-comma-omission COMMA_OMISSION)
+
+if (COMMA_OMISSION)
+    target_compile_options(gbc_sim PRIVATE -Wno-deprecated-variadic-comma-omission)
+endif (COMMA_OMISSION)
+
 # Target compile and link profiling options
 # target_compile_options(gbc_sim PRIVATE -pg)
 # target_link_options(gbc_sim PRIVATE -pg)
 
 target_link_libraries(gbc_sim PRIVATE ${SDL3_TARGET})
+target_link_libraries(gbc_sim PRIVATE argparse)

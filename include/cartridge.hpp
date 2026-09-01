@@ -3,23 +3,25 @@
 #include <memory>
 #include <cstdint>
 #include <vector>
-#include <array>
-#include <iostream>
 #include <fstream>
 #include <filesystem>
 
-const std::uint16_t CGB_FLAG_ADDR = 0x0143;
-const std::uint16_t TITLE_LOW_ADDR = 0x0134;
+
+using memdata_t = std::uint8_t;
+using memaddr_t = std::uint16_t;
+using memory_t = std::vector<memdata_t>;
+const memaddr_t CGB_FLAG_ADDR = 0x0143;
+const memaddr_t TITLE_LOW_ADDR = 0x0134;
 
 class Cartridge {
 protected:
-	std::vector<std::uint8_t> ROM;
-	std::vector<std::uint8_t> RAM;
+	memory_t ROM;
+	memory_t RAM;
 	bool hasBattery;
 public:
 	std::filesystem::path rompath;
-	virtual std::uint8_t read(std::uint16_t addr) = 0;
-	virtual void write(std::uint16_t addr, std::uint8_t data) = 0;
+	virtual memdata_t read(memaddr_t addr) = 0;
+	virtual void write(memaddr_t addr, memdata_t data) = 0;
 	virtual void save() {
 		std::filesystem::path savepath = rompath.replace_extension("sav");
 		std::ofstream savefile(savepath);
