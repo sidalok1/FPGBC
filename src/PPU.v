@@ -154,13 +154,6 @@ module PPU (
     reg [3:0] current_obj = 0, current_obj_n;
     wire [3:0] obj_with_priority;
     wire obj_priority_valid;
-    // PriorityEncoder #(
-    //     .WIDTH(10)
-    // ) obj_priority_encoder (
-    //     .i(obj_valid & obj_x_hit),
-    //     .o(obj_with_priority),
-    //     .v(obj_priority_valid)
-    // );
     PriorityEncoder10 obj_priority_encoder (
         .i(obj_valid & obj_x_hit),
         .o(obj_with_priority),
@@ -565,48 +558,7 @@ module PPU (
                 de2 <= de2_n;
                 hsync <= hsync_n;
                 vsync <= vsync_n;
-
-                // if ( inc_LY ) 
-                //     LY_reg <= (LY_reg == 153) ? 0 : LY_reg + 1;
             end
-            // if ( wen ) begin // memory write logic
-            //     case ( addr_in )
-            //         LCDC:   LCDC_reg <=         data_in;
-            //         STAT:   STAT_reg[7:3] <=    data_in[7:3];
-            //         SCY:    SCY_reg <=          data_in;
-            //         SCX:    SCX_reg <=          data_in;
-            //         // LY is R/O
-            //         LYC:    LYC_reg <=          data_in;
-            //         DMA:    DMA_reg <=          data_in < 8'hDF ? data_in : DMA_reg;
-            //         BGP:    BGP_reg <=          data_in;
-            //         OBP0:   OBP0_reg <=         data_in;
-            //         OBP1:   OBP1_reg <=         data_in;
-            //         WX:     WX_reg <=           data_in;
-            //         WY:     WY_reg <=           data_in;
-            //         KEY0: KEY0_reg <= (KEY0_locked) ?
-            //                         KEY0_reg :  data_in;
-            //         VBK:    VBK_reg[0] <=       data_in[0];
-            //         BANK:   KEY0_locked <= 1;
-            //         BGPI:   BGPI_reg <=         data_in;
-            //         BGPD: begin
-            //             if ( current_mode != drawing )
-            //                 BGP_RGB[BGP_ADDR] <= data_in;
-            //             if ( BGP_AUTO_INC && cpu_en )
-            //                 BGPI_reg[5:0] <= BGPI_reg[5:0] + 1;
-            //         end
-            //         OBPI:   OBPI_reg <=         data_in;
-            //         OBPD: begin
-            //             if ( current_mode != drawing )
-            //                 OBP_RGB[OBP_ADDR] <= data_in;
-            //             if ( OBP_AUTO_INC && cpu_en )
-            //                 OBPI_reg[5:0] <= OBPI_reg[5:0] + 1;
-            //         end
-            //         OPRI:   OPRI_reg <=         data_in;
-            //         default: begin
-            //             // This case block is only for control/status registers
-            //         end
-            //     endcase
-            // end
         end
     end
 
@@ -653,6 +605,8 @@ module PPU (
         next_mode                       = current_mode;
         oamScan_substate_n              = oamScan_substate;
         oam_idx_n                       = oam_idx;
+        addr_in_is_oam = (addr_in >= 16'hFE00) && (addr_in <= 16'hFE9F);
+        addr_in_is_vram = (addr_in >= 16'h8000) && (addr_in <= 16'h9FFF);
         if ( addr_in_is_oam )
             oam_addr                    = addr_in[7:0];
         else
@@ -661,8 +615,6 @@ module PPU (
             vram_addr                   = addr_in[12:0];
         else
             vram_addr                   = 13'b0;
-        // oam_addr                        = addr_in[7:0];
-        // vram_addr                       = addr_in[12:0];
         obj_is_on_line                  = 0;
         objs_on_scanline_n              = objs_on_scanline;
         write_obj_arr                   = 0;
@@ -717,9 +669,6 @@ module PPU (
         hsync_n                         = 1;
         vsync_n                         = 1;
 
-        // inc_LY                          = 0;
-
-
         STAT_reg_n[2] = LY_reg == LYC_reg;
         if ( INTR_LYC_EN == 1 && LY_reg == LYC_reg )
             stat_intr = 1;
@@ -729,8 +678,6 @@ module PPU (
         else
             STAT_reg_n[1:0] = current_mode;
 
-        addr_in_is_oam = (addr_in >= 16'hFE00) && (addr_in <= 16'hFE9F);
-        addr_in_is_vram = (addr_in >= 16'h8000) && (addr_in <= 16'h9FFF);
         // CPU issued writes have lower priority than both ppu and dma. These combinational
         // values can be later overwritten
         if ( wen ) begin
@@ -782,10 +729,8 @@ module PPU (
             endcase
             if ( addr_in_is_oam ) begin
                 oam_we = 1;
-                // oam_addr = addr_in[7:0];
             end
             if ( addr_in_is_vram ) begin
-                // vram_addr = addr_in[12:0];
                 if ( DMG_mode )
                     vram0_we = 1;
                 else if ( VBK_reg[0] == 0 )
@@ -793,10 +738,6 @@ module PPU (
                 else
                     vram1_we = 1;
             end
-                // if ( VBK_reg[0] == 0 )
-                //     vram0_we = 1;
-                // else if ( !DMG_mode )
-                //     vram1_we = 1;
         end
 
         
@@ -924,7 +865,7 @@ module PPU (
                 else
                 if ( !obj_trigger && !obj_state && discard_x > 0 ) begin
                     bgr_fifo_read = (win_state) ? 0 : 1;
-                    // obj_fifo_read = 1;
+                    // obj_fifo_read = 1; 
                     discard_x_n = discard_x - 1;
                 end
                 else
@@ -1099,24 +1040,32 @@ module PPU (
                                 if ( i+1 > obj_fifo_len )
                                     obj_fifo_merge_n[i] = 1; // empty fifo slot
                                 else if ( !OBJ_PRI_MODE ) begin
-                                    // transparent pixel OR new object has lower oam idx
-                                    obj_fifo_merge_n[i] = (obj_fifo[i][5:4] == 2'b0 || obj_addr[5:0] < obj_fifo[i][11:6]) ? 
-                                        1 : 0;
+                                    if ( obj_fifo[i][5:4] != 2'b0 && {obj_high[i], obj_low[i]} != 2'b0) begin
+                                        obj_fifo_merge_n[i] = (obj_addr[5:0] < obj_fifo[i][11:6]) ? 1 : 0;
+                                    end
+                                    else begin
+                                        obj_fifo_merge_n[i] = (obj_fifo[i][5:4] == 2'b0) ? 1 : 0;
+                                    end
                                 end
                                 else begin
-                                    obj_fifo_merge_n[i] = (obj_fifo[i][5:4] == 2'b0) ? 1 : 0;
+                                    obj_fifo_merge_n[i] = (obj_fifo[i][5:4] == 2'b0) ? 
+                                        1 : 0;
                                 end
                             end
                             else begin
                                 if ( i+1 > obj_fifo_len )
                                     obj_fifo_merge_n[i] = 1; // empty fifo slot
                                 else if ( !OBJ_PRI_MODE ) begin
-                                    // transparent pixel OR new object has lower oam idx
-                                    obj_fifo_merge_n[i] = (obj_fifo[7-i][5:4] == 2'b0 || obj_addr[5:0] < obj_fifo[7-i][11:6]) ? 
-                                        1 : 0;
+                                    if ( obj_fifo[i][5:4] != 2'b0 && {obj_high[7-i], obj_low[7-i]} != 2'b0) begin
+                                        obj_fifo_merge_n[i] = (obj_addr[5:0] < obj_fifo[i][11:6]) ? 1 : 0;
+                                    end
+                                    else begin
+                                        obj_fifo_merge_n[i] = (obj_fifo[i][5:4] == 2'b0) ? 1 : 0;
+                                    end
                                 end
                                 else begin
-                                    obj_fifo_merge_n[i] = (obj_fifo[7-i][5:4] == 2'b0) ? 1 : 0;
+                                    obj_fifo_merge_n[i] = (obj_fifo[i][5:4] == 2'b0) ? 
+                                        1 : 0;
                                 end
                             end
                         end
