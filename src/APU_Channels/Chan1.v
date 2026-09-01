@@ -114,8 +114,11 @@ module Chan1 (
         period_overflow_n  = period_overflow;
         period_divider_n = period_divider;
         sweep_state_n = sweep_state;
+        env_sweep_state_n = env_sweep_state;
         sweep_timer_n = div_event ? sweep_timer + 1 : sweep_timer;
+        env_sweep_timer_n = env_sweep_timer;
         pace_counter_n = pace_counter;
+        env_pace_counter_n = env_pace_counter;
         duty_step_counter_n = duty_step_counter;
         length_timer_n = length_timer;
         channel_on = CHANNEL_STATE;

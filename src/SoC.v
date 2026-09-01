@@ -85,7 +85,6 @@ module SoC #(
         .addr_in(sig_cpu_addrbus), .addr_out(sig_ppu_addro),
         .data_in(sig_cpu_dout), .data_out(sig_ppu_dout), .dma_data_in(sig_mac_ppu_din),
         .wen(sig_cpu_we), .ren(sig_cpu_re),
-        .dbl_spd(sig_cpu_dbl_spd),
         .wout(sig_ppu_wout),
         .rout(sig_ppu_rout),
         .hsync(hsync), .vsync(vsync),

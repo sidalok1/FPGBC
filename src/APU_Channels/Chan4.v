@@ -102,6 +102,9 @@ module Chan4 (
         NR43_reg_n = NR43_reg;
         NR44_reg_n = NR44_reg;
         lfsr_n = lfsr;
+        env_sweep_state_n = env_sweep_state;
+        env_sweep_timer_n = env_sweep_timer;
+        env_pace_counter_n = env_pace_counter;
         volume_n = volume;
         feedback_bit = ~(lfsr[0] ^ lfsr[1]);
         counter_n = (CLOCK_SHIFT != 4'd15 && CLOCK_SHIFT != 4'd14) ?

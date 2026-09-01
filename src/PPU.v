@@ -8,7 +8,6 @@ module PPU (
     output reg [7:0] data_out,
     input wire [7:0] dma_data_in,
     input wire wen, ren,
-    input wire dbl_spd,
     output reg wout, rout,
 
     output reg hsync, vsync,
@@ -149,7 +148,8 @@ module PPU (
     reg [3:0] objs_on_scanline = 0, objs_on_scanline_n;
     reg [7:0] oam_idx = 0, oam_idx_n;
 
-    reg [7:0] obj_arr [0:9][0:4]; // ypos, xpos, tile, attr, obj num
+    reg [7:0] obj_arr [0:9][0:3]; // ypos, xpos, tile, attr, obj num
+    reg [5:0] obj_addr_arr [0:9];
     reg [9:0] obj_valid = 0, obj_valid_n, obj_x_hit;
     reg [3:0] current_obj = 0, current_obj_n;
     wire [3:0] obj_with_priority;
@@ -163,7 +163,7 @@ module PPU (
     // wire [7:0] obj_x = obj_arr[current_obj][1]; unused
     wire [7:0] obj_tile = (OBJ_SIZE == 0) ? obj_arr[current_obj][2] : obj_arr[current_obj][2] & 8'hFE;
     wire [7:0] obj_attr = obj_arr[current_obj][3];
-    wire [7:0] obj_addr = obj_arr[current_obj][4];
+    wire [5:0] obj_addr = obj_addr_arr[current_obj];
     
     reg write_obj_arr;
     reg [1:0] obj_arr_elem;
@@ -259,7 +259,6 @@ module PPU (
 
         reg [7:0] output_x = 0, output_x_n;
         reg [2:0] discard_x = 0, discard_x_n;
-        reg halt_output;
         // same format as fifo pixels, but idx 0 is 0 for background/window and 1 for objects
         reg [5:0] mixed_pixel = 0, mixed_pixel_n, mixed_pixel0 = 0, mixed_pixel0_n;
         reg [3:0] pallet_idx = 0, pallet_idx_n;
@@ -267,18 +266,6 @@ module PPU (
         reg [7:0] rgb_high = 0, rgb_high_n;
         reg [4:0] r_n, g_n, b_n;
         reg de2 = 0, de2_n, de1 = 0, de0 = 0;
-
-        // wire [7:0] DMG_RGB [0:9];
-        // assign DMG_RGB[0] = {3'b000, 5'b11000}; // white
-        // assign DMG_RGB[1] = {1'b0, 5'b11000, 2'b11};
-        // assign DMG_RGB[2] = {3'b000, 5'b10000}; // light gray
-        // assign DMG_RGB[3] = {1'b0, 5'b10000, 2'b10};
-        // assign DMG_RGB[4] = {3'b000, 5'b01000}; // dark gray
-        // assign DMG_RGB[5] = {1'b0, 5'b01000, 2'b01};
-        // assign DMG_RGB[6] = {3'b000, 5'b00000}; // black
-        // assign DMG_RGB[7] = {1'b0, 5'b00000, 2'b00};
-        // assign DMG_RGB[8] = 8'hFF; // blank
-        // assign DMG_RGB[9] = 8'hFF;
 
         reg [7:0] BGP_RGB [0:63];
         reg BGP_RGB_we;
@@ -398,7 +385,8 @@ module PPU (
                 obj_arr[i][1] = 0;
                 obj_arr[i][2] = 0;
                 obj_arr[i][3] = 0;
-                obj_arr[i][4] = 0;
+                // obj_arr[i][4] = 0;
+                obj_addr_arr[i] = 0;
             end
             if ( i < 8 ) begin
                 bgr_fifo[i] = 0;
@@ -422,7 +410,8 @@ module PPU (
                 obj_arr[i][1] <= 0;
                 obj_arr[i][2] <= 0;
                 obj_arr[i][3] <= 0;
-                obj_arr[i][4] <= 0;
+                // obj_arr[i][4] <= 0;
+                obj_addr_arr[i] <= 0;
             end
             obj_valid <= 0;
             objs_on_scanline <= 0;
@@ -518,9 +507,9 @@ module PPU (
                 oamScan_substate <= oamScan_substate_n;
                 oam_idx <= oam_idx_n;
                 if ( write_obj_arr ) begin
-                    obj_arr[objs_on_scanline][{1'b0, obj_arr_elem}] <= obj_arr_data;
+                    obj_arr[objs_on_scanline][obj_arr_elem] <= obj_arr_data;
                     if ( obj_arr_elem == 0 ) // adding new element to object array
-                        obj_arr[objs_on_scanline][4] <= oam_idx / 4; // position in OAM
+                        obj_addr_arr[objs_on_scanline] <= oam_idx[7:2]; // position in OAM
                 end
                 obj_valid <= obj_valid_n;
                 objs_on_scanline <= objs_on_scanline_n;
@@ -642,8 +631,7 @@ module PPU (
         obj_high_n                      = obj_high;
 
         output_x_n                      = output_x;
-        discard_x_n                     = discard_x;              
-        halt_output                     = 0;
+        discard_x_n                     = discard_x;
 
         mixed_pixel_n                   = mixed_pixel;
         mixed_pixel0_n                  = mixed_pixel0;
@@ -670,7 +658,7 @@ module PPU (
         vsync_n                         = 1;
 
         STAT_reg_n[2] = LY_reg == LYC_reg;
-        if ( INTR_LYC_EN == 1 && LY_reg == LYC_reg )
+        if ( INTR_LYC_EN == 1 && LY_EQ_LYC )
             stat_intr = 1;
         if ( !LCD_EN ) begin
             STAT_reg_n[1:0] = 0;
@@ -1048,7 +1036,7 @@ module PPU (
                                     end
                                 end
                                 else begin
-                                    obj_fifo_merge_n[i] = (obj_fifo[i][5:4] == 2'b0) ? 
+                                    obj_fifo_merge_n[i] = (obj_fifo[i][5:4] == 2'b0 && {obj_high[i], obj_low[i]} != 2'b0) ? 
                                         1 : 0;
                                 end
                             end
@@ -1064,7 +1052,7 @@ module PPU (
                                     end
                                 end
                                 else begin
-                                    obj_fifo_merge_n[i] = (obj_fifo[i][5:4] == 2'b0) ? 
+                                    obj_fifo_merge_n[i] = (obj_fifo[i][5:4] == 2'b0 && {obj_high[7-i], obj_low[7-i]} != 2'b0) ? 
                                         1 : 0;
                                 end
                             end

@@ -90,7 +90,7 @@ module MAC(
         cpu_din = 8'h00;
         ppu_din = 8'h00;
 
-        cpu_addr_in_bootrom =   (cpu_addr >= 16'h0000 && cpu_addr <= 16'h00FF) ||
+        cpu_addr_in_bootrom =   (cpu_addr <= 16'h00FF) ||
                                 (cpu_addr >= 16'h0200 && cpu_addr <= 16'h08FF);
         cpu_addr_in_wram = cpu_addr >= 16'hC000 && cpu_addr <= 16'hCFFF;
         ppu_addr_in_wram = ppu_addr >= 16'hC000 && ppu_addr <= 16'hCFFF;
@@ -100,9 +100,9 @@ module MAC(
         ppu_addr_in_echo = ppu_addr >= 16'hE000 && ppu_addr <= 16'hEFFF;
         cpu_addr_echo_banked = cpu_addr >= 16'hF000 && cpu_addr <= 16'hFDFF;
         ppu_addr_echo_banked = ppu_addr >= 16'hF000 && ppu_addr <= 16'hFDFF;
-        cpu_addr_in_cart =  (cpu_addr >= 16'h0000 && cpu_addr <= 16'h7FFF) ||
+        cpu_addr_in_cart =  (cpu_addr <= 16'h7FFF) ||
                             (cpu_addr >= 16'hA000 && cpu_addr <= 16'hBFFF);
-        ppu_addr_in_cart =  (ppu_addr >= 16'h0000 && ppu_addr <= 16'h7FFF) ||
+        ppu_addr_in_cart =  (ppu_addr <= 16'h7FFF) ||
                             (ppu_addr >= 16'hA000 && ppu_addr <= 16'hBFFF);
 
         if ( cpu_addr_in_wram || cpu_addr_in_echo ) begin

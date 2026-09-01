@@ -48,14 +48,14 @@ module APU (
     //  |                   CHANNEL_2                   |                   CHANNEL_1                   |
     //  |                                              R/O                                              |  
     reg [7:0] PCM12_reg;
-    wire [3:0] PCM1 = PCM12_reg[3:0];
-    wire [3:0] PCM2 = PCM12_reg[7:4];
+    // wire [3:0] PCM1 = PCM12_reg[3:0];
+    // wire [3:0] PCM2 = PCM12_reg[7:4];
 
     //  |                   CHANNEL_4                   |                   CHANNEL_3                   |
     //  |                                              R/O                                              | 
     reg [7:0] PCM34_reg;
-    wire [3:0] PCM3 = PCM34_reg[3:0];
-    wire [3:0] PCM4 = PCM34_reg[7:4];
+    // wire [3:0] PCM3 = PCM34_reg[3:0];
+    // wire [3:0] PCM4 = PCM34_reg[7:4];
 
     wire [7:0] sig_c1_dout, sig_c2_dout, sig_c3_dout, sig_c4_dout;
     wire [3:0] sig_c1_dac, sig_c2_dac, sig_c3_dac, sig_c4_dac;

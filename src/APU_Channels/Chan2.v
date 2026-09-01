@@ -85,14 +85,17 @@ module Chan2 (
         `endif
         dout = 8'b0;
         dac_data = 4'b0;
+        channel_on = CHANNEL_STATE;
         NR21_reg_n = NR21_reg;
         NR22_reg_n = NR22_reg;
         NR23_reg_n = NR23_reg;
         NR24_reg_n = NR24_reg;
         period_divider_n = period_divider;
+        env_sweep_state_n = env_sweep_state;
+        env_sweep_timer_n = env_sweep_timer;
+        env_pace_counter_n = env_pace_counter;
         duty_step_counter_n = duty_step_counter;
         length_timer_n = length_timer;
-        channel_on = CHANNEL_STATE;
         volume_n = volume;
 
         if ( re ) begin

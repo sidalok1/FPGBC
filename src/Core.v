@@ -68,7 +68,6 @@ module Core(
     // cpu speed control
     localparam [7:0] KEY1_mask = 8'h7E; 
     reg [7:0] KEY1_reg = 8'h00, KEY1_n;
-    reg speed_n = 0;
     wire speed = KEY1_reg[7];
     assign dbl_spd = speed;
     wire armed = KEY1_reg[0];
@@ -252,7 +251,6 @@ module Core(
         cpu_active = 1;
         enable_controller = 1;
         
-        speed_n = speed;
         // sig_wake_n = sig_wake;
         stop = 0;
         we = 0;
