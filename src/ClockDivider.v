@@ -1,21 +1,22 @@
 `default_nettype none
 module ClockDivider #(
-    parameter I_CLK_FRQ = 100_000_000,
-    parameter O_CLK_FRQ = 1
+    parameter real I_CLK_FRQ = 100e6,
+    parameter real O_CLK_FRQ = 1
 ) (
     input wire rst, en,
     input wire i_clk,
     output reg o_clk
 );
 
+    localparam integer DIV = int'(I_CLK_FRQ / O_CLK_FRQ);
+
 generate
-    if ( I_CLK_FRQ <= O_CLK_FRQ ) begin : no_clock_division
+    if ( DIV <= 1 ) begin : no_clock_division
         always @* begin
             o_clk = en;
         end
     end
     else begin : clock_division
-        localparam DIV = I_CLK_FRQ / O_CLK_FRQ;
         localparam WIDTH = $clog2(DIV);
         localparam [WIDTH-1:0] divider = DIV;
 

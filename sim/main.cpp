@@ -142,8 +142,8 @@ static constexpr int WIN_H       = GBC_H * SCALE;
 constexpr double GB_FRAME_HZ = 60.0;
 constexpr duration<double> FRAME_PERIOD(1.0 / GB_FRAME_HZ);
 
-static constexpr uint64_t GB_SEC = 4e6;
 #ifdef CYCLE_LIMIT
+static constexpr uint64_t GB_SEC = 4e6;
 static constexpr uint64_t MAX_CYCLES = GB_SEC * 120;
 #endif
 
@@ -365,7 +365,7 @@ int main(int argc, char** argv) {
 
     bool running    = true;
     bool in_vblank  = false;
-    float seconds = 0;
+    // float seconds = 0;
 
     bool    up = false,
             down = false,
@@ -497,7 +497,7 @@ int main(int argc, char** argv) {
             }
         }
         #endif
-        ctx->timeInc(clk_period_half); seconds += 1/4e6;
+        ctx->timeInc(clk_period_half); // seconds += 1/4e6;
         gbc->clk = 1; gbc->eval();
         #ifdef EMULATE_CARTRIDGE
         if ( gbc->cart_we ) {
@@ -522,7 +522,7 @@ int main(int argc, char** argv) {
             start = high_resolution_clock::now();
         }
         #endif
-        ctx->timeInc(clk_period_half); seconds += 1/4e6;
+        ctx->timeInc(clk_period_half); // seconds += 1/4e6;
 
         #ifdef DUMP_VRAM
         if ( DUMP_VRAM_COND ) {

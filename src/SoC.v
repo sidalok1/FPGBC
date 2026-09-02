@@ -1,6 +1,6 @@
 `default_nettype none
 module SoC #(
-    parameter clk_frq  = 100_000_000
+    parameter real clk_frq  = 100e6
 )  ( 
     `ifdef DEBUG
     output wire dbg_break,
@@ -56,7 +56,7 @@ module SoC #(
 
     ClockDivider #(
         .I_CLK_FRQ(clk_frq),
-        .O_CLK_FRQ(4_000_000)
+        .O_CLK_FRQ(4.194304e6)
     ) system_clock_divider (
         .rst( rst ), .en( 1'b1 ),
         .i_clk( clk ),

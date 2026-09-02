@@ -36,7 +36,7 @@ module System (
     assign de = pix_de & dotclk;
 
     SoC #(
-        .clk_frq(4_000_000)
+        .clk_frq(4.194304e6)
     ) Gameboy_SOC (
         `ifdef DEBUG
         .dbg_break(dbg_break),
